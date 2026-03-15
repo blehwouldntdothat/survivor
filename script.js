@@ -186,6 +186,33 @@ function attemptIdolFind(tribePlayers, tribeName) {
     return html;
 }
 
+function runEvent(tribe) {
+    const size = tribe.length;
+
+    const possible = EVENTS.filter(e =>
+        (typeof e.players === "number" && e.players <= size) ||
+        e.players === "tribe"
+    );
+
+    if (possible.length === 0) return "";
+
+    const event = possible[Math.floor(Math.random() * possible.length)];
+
+    let chosenPlayers;
+
+    if (event.players === "tribe") {
+        chosenPlayers = [...tribe];
+    } else {
+        chosenPlayers = shuffle([...tribe]).slice(0, event.players);
+    }
+
+    event.change.forEach(([a, b, amount]) => {
+        adjustRelationship(chosenPlayers[a], chosenPlayers[b], amount);
+    });
+
+    return showImages(chosenPlayers) + event.text(chosenPlayers);
+}
+
 function runEventWithIdols(tribePlayers, tribeName) {
     let html = "";
     html += attemptIdolFind(tribePlayers, tribeName);
