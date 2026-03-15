@@ -1,0 +1,16 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #f3f3f3;
+    padding: 20px;
+}
+
+h1 {
+    color: #2c6e49;
+}
+
+#log {
+    margin-top: 20px;
+    padding: 10px;
+    background: white;
+    border-radius: 6px;
+}
