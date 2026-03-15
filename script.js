@@ -60,7 +60,7 @@ function initRelationships(players) {
     });
 }
 
-// 1–5 stats, default 3 (stat editor coming soon)
+// 1–5 stats, default 3
 function initStats(players) {
     players.forEach(p => {
         stats[p] = {
@@ -715,36 +715,182 @@ function runEpisode() {
 }
 
 /* ============================================================
+   MAIN MENU: CAST + STAT EDITOR
+   ============================================================ */
+
+function renderCastList() {
+    const container = document.getElementById("castList");
+    container.innerHTML = "";
+
+    cast.forEach(name => {
+        const card = document.createElement("div");
+        card.className = "castCard";
+
+        const img = document.createElement("img");
+        img.src = photos[name] || "https://via.placeholder.com/80?text=No+Image";
+        img.alt = name;
+
+        const label = document.createElement("div");
+        label.textContent = name;
+
+        const removeBtn = document.createElement("button");
+        removeBtn.textContent = "Remove";
+        removeBtn.onclick = () => {
+            cast = cast.filter(n => n !== name);
+            delete photos[name];
+            delete stats[name];
+            delete relationships[name];
+            renderCastList();
+        };
+
+        card.appendChild(img);
+        card.appendChild(label);
+        card.appendChild(removeBtn);
+        container.appendChild(card);
+    });
+}
+
+function addContestant() {
+    const nameInput = document.getElementById("newName");
+    const photoInput = document.getElementById("newPhoto");
+
+    const name = nameInput.value.trim();
+    const url = photoInput.value.trim();
+
+    if (!name) return;
+
+    if (!cast.includes(name)) {
+        cast.push(name);
+        photos[name] = url || null;
+    } else {
+        photos[name] = url || photos[name] || null;
+    }
+
+    nameInput.value = "";
+    photoInput.value = "";
+
+    renderCastList();
+}
+
+function openStatEditor() {
+    if (cast.length === 0) return;
+
+    // Ensure stats/relationships exist for all
+    initRelationships(cast);
+    initStats(cast);
+
+    document.getElementById("mainMenu").style.display = "block";
+    document.getElementById("game").style.display = "none";
+    document.getElementById("statEditor").style.display = "block";
+
+    renderStatEditor();
+}
+
+function renderStatEditor() {
+    const container = document.getElementById("statEditorContent");
+    container.innerHTML = "";
+
+    cast.forEach(name => {
+        const block = document.createElement("div");
+        block.className = "statBlock";
+
+        const header = document.createElement("div");
+        header.className = "statHeader";
+
+        const img = document.createElement("img");
+        img.src = photos[name] || "https://via.placeholder.com/80?text=No+Image";
+        img.alt = name;
+
+        const title = document.createElement("div");
+        title.textContent = name;
+
+        header.appendChild(img);
+        header.appendChild(title);
+        block.appendChild(header);
+
+        const row1 = document.createElement("div");
+        row1.className = "statRow";
+        row1.appendChild(makeStatField(name, "physical", "Physical"));
+        row1.appendChild(makeStatField(name, "endurance", "Endurance"));
+        row1.appendChild(makeStatField(name, "mental", "Mental"));
+        row1.appendChild(makeStatField(name, "social", "Social"));
+
+        const row2 = document.createElement("div");
+        row2.className = "statRow";
+        row2.appendChild(makeStatField(name, "temperament", "Temperament"));
+        row2.appendChild(makeStatField(name, "luck", "Luck"));
+        row2.appendChild(makeStatField(name, "strategy", "Strategy"));
+        row2.appendChild(makeStatField(name, "loyalty", "Loyalty"));
+
+        block.appendChild(row1);
+        block.appendChild(row2);
+
+        container.appendChild(block);
+    });
+}
+
+function makeStatField(name, key, labelText) {
+    const wrapper = document.createElement("div");
+
+    const label = document.createElement("label");
+    label.textContent = labelText + ":";
+
+    const select = document.createElement("select");
+    select.dataset.player = name;
+    select.dataset.stat = key;
+
+    for (let i = 1; i <= 5; i++) {
+        const opt = document.createElement("option");
+        opt.value = i;
+        opt.textContent = i;
+        if ((stats[name] && stats[name][key] === i) || (!stats[name] && i === 3)) {
+            opt.selected = true;
+        }
+        select.appendChild(opt);
+    }
+
+    wrapper.appendChild(label);
+    wrapper.appendChild(select);
+    return wrapper;
+}
+
+function saveStatsAndReturn() {
+    const selects = document.querySelectorAll("#statEditorContent select");
+    selects.forEach(sel => {
+        const player = sel.dataset.player;
+        const key = sel.dataset.stat;
+        const value = parseInt(sel.value, 10);
+
+        if (!stats[player]) stats[player] = {};
+        stats[player][key] = value;
+    });
+
+    document.getElementById("statEditor").style.display = "none";
+}
+
+/* ============================================================
    SETUP + BUTTONS
    ============================================================ */
 
-document.getElementById("startBtn").onclick = () => {
-    const input = document.getElementById("castInput").value.trim();
-    const lines = input.split("\n");
+document.getElementById("addContestantBtn").onclick = addContestant;
+document.getElementById("editStatsBtn").onclick = openStatEditor;
+document.getElementById("saveStatsBtn").onclick = saveStatsAndReturn;
 
-    cast = [];
-    photos = {};
+document.getElementById("startBtn").onclick = () => {
+    if (cast.length === 0) return;
+
     merged = false;
     tribes = { A: [], B: [], Merged: [] };
     episode = 1;
     episodeResults = [];
-    relationships = {};
-    stats = {};
     jury = [];
     finaleSize = null;
     finaleFinalists = [];
     finaleWinner = null;
 
-    lines.forEach(line => {
-        let parts = line.split(",");
-        let name = parts[0].trim();
-        let url = parts[1] ? parts[1].trim() : null;
-
-        if (name.length > 0) {
-            cast.push(name);
-            photos[name] = url || null;
-        }
-    });
+    // Ensure stats/relationships exist
+    initRelationships(cast);
+    initStats(cast);
 
     if (cast.length < 10) {
         merged = true;
@@ -755,10 +901,8 @@ document.getElementById("startBtn").onclick = () => {
         assignTribes();
     }
 
-    initRelationships(cast);
-    initStats(cast);
-
-    document.getElementById("setup").style.display = "none";
+    document.getElementById("mainMenu").style.display = "none";
+    document.getElementById("statEditor").style.display = "none";
     document.getElementById("game").style.display = "block";
 
     if (merged) {
