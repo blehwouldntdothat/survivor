@@ -44,3 +44,13 @@ table img.contestant-photo {
     margin-right: auto;
 }
 
+/* NEW: TIE + TIEBRK colours */
+.td-tie {
+    background: #ffddaa;
+}
+
+.td-tiebrk {
+    background: #ff8800;
+    color: white;
+    font-weight: bold;
+}
