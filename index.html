@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Survivor Simulator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Survivor Simulator</h1>
+
+<div id="setup">
+    <h2>Cast Setup</h2>
+    <textarea id="castInput" rows="10" cols="40"
+        placeholder="Enter one castaway per line"></textarea>
+    <br>
+    <button id="startBtn">Start Season</button>
+</div>
+
+<div id="game" style="display:none;">
+    <h2>Season Progress</h2>
+    <button id="nextEpisodeBtn">Run Next Episode</button>
+    <div id="log"></div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
