@@ -437,32 +437,122 @@ function nullifyVotes(votes, protectedPlayer) {
 }
 
 function showTrackRecord() {
-    let html = `<h3>Track Record</h3>`;
+    let html = `<h2>Season Track Record</h2>`;
 
-    html += `<table class="trackTable"><tr><th>Player</th>`;
+    const totalEpisodes = episodeResults.length;
 
-    episodeResults.forEach((_, i) => {
-        html += `<th>Ep ${i + 1}</th>`;
-    });
+    html += `<table border="1" cellpadding="6" style="margin:auto; border-collapse:collapse;">`;
 
-    html += `<th>Placement</th></tr>`;
+    html += `<tr>
+                <th rowspan="2">Rank</th>
+                <th rowspan="2">Contestant</th>
+                <th rowspan="2">Photo</th>`;
 
-    cast.forEach(p => {
-        html += `<tr><td>${p}</td>`;
+    for (let i = 1; i <= totalEpisodes; i++) {
+        html += `<th>Ep. ${i}</th>`;
+    }
 
-        episodeResults.forEach(ep => {
-            const result = ep.results[p] || "";
-            html += `<td>${result}</td>`;
+    html += `<th>Ep. ${episode}</th>`;
+    html += `</tr>`;
+
+    html += `<tr>`;
+
+    let i = 0;
+    while (i < episodeResults.length) {
+        let phase = episodeResults[i].phase;
+        let span = 1;
+
+        while (
+            i + span < episodeResults.length &&
+            episodeResults[i + span].phase === phase
+        ) {
+            span++;
+        }
+
+        html += `<td colspan="${span}" style="background:#ddd; font-weight:bold;">${phase}</td>`;
+        i += span;
+    }
+
+    html += `<td style="background:#ddd; font-weight:bold;">Final</td>`;
+    html += `</tr>`;
+
+    const sortedPlayers = Object.keys(stats).sort((a, b) => stats[a].placement - stats[b].placement);
+
+    let runnerUps = [];
+    if (finaleFinalists.length > 0 && finaleWinner) {
+        runnerUps = finaleFinalists.filter(p => p !== finaleWinner);
+    }
+    let printedSecondPlace = false;
+
+    sortedPlayers.forEach(player => {
+        const placement = stats[player].placement;
+        const isRunnerUp = runnerUps.includes(player) && runnerUps.length === 2;
+
+        html += `<tr>`;
+
+        if (placement === 2 && isRunnerUp) {
+            if (!printedSecondPlace) {
+                html += `<td rowspan="2">2</td>`;
+                printedSecondPlace = true;
+            }
+        } else {
+            html += `<td>${placement}</td>`;
+        }
+
+        html += `<td>${player}</td>`;
+        html += `<td>${showImage(player)}</td>`;
+
+        const eliminatedEp = stats[player].eliminatedEpisode;
+
+        episodeResults.forEach((ep, index) => {
+            const epNum = index + 1;
+
+            if (eliminatedEp && epNum > eliminatedEp) {
+                html += `<td style="background:#dddddd;"></td>`;
+                return;
+            }
+
+            let result = ep.results[player] || "";
+
+            let bg = "white";
+            let color = "black";
+
+            if (result === "OUT") bg = "#ff9999";
+            if (result === "IMM") bg = ep.phase === "Pre-Merge" ? "#55cc55" : "#99ff99";
+            if (result === "SAFE") bg = "white";
+            if (result === "TIE") bg = "#ffbb66";
+            if (result === "TIEBRK") {
+                bg = "#cc5500";
+                color = "white";
+                result = "TIE";
+            }
+
+            html += `<td style="background:${bg}; color:${color};">${result}</td>`;
         });
 
-        html += `<td>${stats[p].placement || ""}</td></tr>`;
+        if (jury.includes(player)) {
+            const votedFor = stats[player].votedForWinner || "—";
+            html += `<td style="background:#e6e6e6; color:black; text-align:center;">
+                        <strong>JUROR</strong><br>
+                        <small><em>(${votedFor})</em></small>
+                     </td>`;
+        } else if (finaleFinalists.includes(player)) {
+            if (player === finaleWinner) {
+                html += `<td style="background:#ffd700; font-weight:bold; text-align:center;">WINNER</td>`;
+            } else {
+                html += `<td style="background:#c0c0c0; font-weight:bold; text-align:center;">RUNNER-UP</td>`;
+            }
+        } else {
+            html += `<td style="background:#dddddd;"></td>`;
+        }
+
+        html += `</tr>`;
     });
 
     html += `</table>`;
 
-    setLog(html);
+    document.getElementById("log").innerHTML += html;
 }
-
 
 /* ============================================================
    IDOL EXPIRATION (NEW)
