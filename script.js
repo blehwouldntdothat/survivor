@@ -7,8 +7,9 @@ let merged = false;
 let mergeAt = Math.floor(Math.random() * 4) + 8; // 8–11 players
 let minMergeEpisode = 4 + Math.floor(Math.random() * 2); // episode 4 or 5
 
-// RELATIONSHIPS
-let relationships = {}; // relationships[player][other] = score
+// RELATIONSHIPS + STATS
+let relationships = {};
+let stats = {};
 
 function setLog(html) {
     document.getElementById("log").innerHTML = html;
@@ -23,9 +24,29 @@ function initRelationships(players) {
         relationships[p] = {};
         players.forEach(o => {
             if (p !== o) {
-                relationships[p][o] = 40 + Math.floor(Math.random() * 20); // 40–60
+                relationships[p][o] = 40 + Math.floor(Math.random() * 20);
             }
         });
+    });
+}
+
+function initStats(players) {
+    players.forEach(p => {
+        stats[p] = {
+            tribeHistory: [],
+            immunityWins: 0,
+            votesReceived: 0,
+            votesCast: [],
+            placement: null
+        };
+    });
+}
+
+function recordTribeHistory() {
+    [...tribes.A, ...tribes.B, ...tribes.Merged].forEach(p => {
+        if (tribes.A.includes(p)) stats[p].tribeHistory.push("A");
+        else if (tribes.B.includes(p)) stats[p].tribeHistory.push("B");
+        else stats[p].tribeHistory.push("Merged");
     });
 }
 
@@ -82,12 +103,32 @@ function checkMerge() {
     return false;
 }
 
+function showTrackRecord() {
+    let html = `<h2>Season Track Record</h2>`;
+
+    Object.entries(stats).forEach(([player, s]) => {
+        html += `
+            <div style="margin-bottom:20px;">
+                <h3>${player} — Placement: ${s.placement}</h3>
+                <p><strong>Tribes:</strong> ${s.tribeHistory.join(", ")}</p>
+                <p><strong>Immunity Wins:</strong> ${s.immunityWins}</p>
+                <p><strong>Votes Received:</strong> ${s.votesReceived}</p>
+                <p><strong>Votes Cast:</strong> ${s.votesCast.join(", ")}</p>
+            </div>
+        `;
+    });
+
+    document.getElementById("log").innerHTML += html;
+}
+
 function runEpisode() {
     let html = `<h3>Episode ${episode}</h3>`;
 
+    recordTribeHistory();
+
     const remaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
 
-    // MERGE CHECK (but continue episode)
+    // MERGE CHECK
     if (checkMerge()) {
         html += `<h2>Merge!</h2>`;
         html += `<p>The tribes merge into one group.</p>`;
@@ -103,6 +144,7 @@ function runEpisode() {
         html += `<p><strong>Immunity Challenge:</strong> Tribe ${winning} wins immunity!</p>`;
     } else {
         immune = remaining[Math.floor(Math.random() * remaining.length)];
+        stats[immune].immunityWins++;
         html += `<p><strong>Individual Immunity:</strong> ${immune} wins immunity!</p>`;
     }
 
@@ -124,6 +166,8 @@ function runEpisode() {
     if (voters.length === 1) {
         const eliminated = voters[0];
         html += `<p>${eliminated} is automatically eliminated.</p>`;
+        stats[eliminated].placement = remaining.length;
+
         if (merged) tribes.Merged = [];
         else tribes[losingTribe] = [];
     } else {
@@ -133,6 +177,7 @@ function runEpisode() {
             let choices = voters.filter(p => p !== voter && p !== immune);
             let voteFor = choices[Math.floor(Math.random() * choices.length)];
             votes[voter] = voteFor;
+            stats[voter].votesCast.push(voteFor);
         });
 
         html += `<p><strong>Votes:</strong></p>`;
@@ -148,6 +193,9 @@ function runEpisode() {
         const eliminated = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
         html += `<p><strong>${eliminated} is voted out.</strong></p>`;
 
+        stats[eliminated].votesReceived += tally[eliminated];
+        stats[eliminated].placement = remaining.length;
+
         if (merged) {
             tribes.Merged = voters.filter(p => p !== eliminated);
         } else {
@@ -158,8 +206,16 @@ function runEpisode() {
     // WINNER CHECK
     const finalRemaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
     if (finalRemaining.length === 1) {
-        html += `<h2>${finalRemaining[0]} wins Survivor!</h2>`;
+        const winner = finalRemaining[0];
+        stats[winner].placement = 1;
+
+        html += `<h2>${winner} wins Survivor!</h2>`;
+        setLog(html);
+
+        showTrackRecord();
+
         document.getElementById("nextEpisodeBtn").disabled = true;
+        return;
     }
 
     setLog(html);
@@ -172,6 +228,7 @@ document.getElementById("startBtn").onclick = () => {
 
     assignTribes();
     initRelationships(cast);
+    initStats(cast);
 
     document.getElementById("setup").style.display = "none";
     document.getElementById("game").style.display = "block";
