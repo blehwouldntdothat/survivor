@@ -334,8 +334,8 @@ document.getElementById("startBtn").onclick = () => {
         }
     });
 
-    // AUTO-MERGE MODE
-    if (cast.length < 4) {
+    // AUTO-MERGE MODE: Start merged if cast < 10
+    if (cast.length < 10) {
         merged = true;
         tribes.A = [];
         tribes.B = [];
@@ -353,7 +353,7 @@ document.getElementById("startBtn").onclick = () => {
     if (merged) {
         setLog(`
             <h3>Season Begins!</h3>
-            <p>The game begins at the <strong>Merge</strong> due to a small cast.</p>
+            <p>The game begins at the <strong>Merge</strong> due to a small cast (${cast.length} players).</p>
         `);
     } else {
         setLog(`
