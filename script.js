@@ -186,6 +186,11 @@ function attemptIdolFind(tribePlayers, tribeName) {
     return html;
 }
 
+function adjustRelationship(a, b, amount) {
+    relationships[a][b] = Math.max(0, Math.min(100, relationships[a][b] + amount));
+    relationships[b][a] = Math.max(0, Math.min(100, relationships[b][a] + amount));
+}
+
 function runEvent(tribe) {
     const size = tribe.length;
 
@@ -262,6 +267,49 @@ function computePlayerScore(player, weights) {
     }
     score += stats[player].luck * 0.2;
     return score;
+}
+
+function handleIdolPlay(voters, immune) {
+    let html = "";
+    let playedBy = null;
+
+    // Anyone holding an idol may randomly choose to play it
+    for (const player of voters) {
+        if (idolsHeld[player]) {
+            const chance = 0.25 + (stats[player].luck * 0.05); // 25% + luck bonus
+
+            if (Math.random() < chance) {
+                playedBy = player;
+                html += `
+                    <div class="idolPlayBox">
+                        ⭐ <strong>${player} plays a Hidden Immunity Idol!</strong>
+                    </div>
+                `;
+                delete idolsHeld[player];
+                break;
+            }
+        }
+    }
+
+    return { playedBy, html };
+}
+
+function nullifyVotes(votes, protectedPlayer) {
+    if (!protectedPlayer) return { newVotes: votes, nullifiedCount: 0 };
+
+    let newVotes = {};
+    let nullifiedCount = 0;
+
+    for (const voter in votes) {
+        if (votes[voter] === protectedPlayer) {
+            newVotes[voter] = null;
+            nullifiedCount++;
+        } else {
+            newVotes[voter] = votes[voter];
+        }
+    }
+
+    return { newVotes, nullifiedCount };
 }
 
 /* ============================================================
