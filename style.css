@@ -8,3 +8,23 @@ body {
     align-items: center;
     text-align: center;
 }
+
+img.contestant-photo {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-bottom: 6px;
+}
+
+#log img.contestant-photo {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+table img.contestant-photo {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
