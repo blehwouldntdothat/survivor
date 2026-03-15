@@ -4,13 +4,14 @@ let episode = 1;
 
 // MERGE RULES
 let merged = false;
-let mergeAt = Math.floor(Math.random() * 4) + 8; // 8–11 players
-let minMergeEpisode = 4 + Math.floor(Math.random() * 2); // episode 4 or 5
+let mergeAt = Math.floor(Math.random() * 4) + 8;
+let minMergeEpisode = 4 + Math.floor(Math.random() * 2);
 
-// RELATIONSHIPS + STATS + EPISODE RESULTS
+// RELATIONSHIPS + STATS + EPISODE RESULTS + PHOTOS
 let relationships = {};
 let stats = {};
 let episodeResults = [];
+let photos = {};
 
 function setLog(html) {
     document.getElementById("log").innerHTML = html;
@@ -65,7 +66,7 @@ function assignTribes() {
 
 function randomEvent(tribe) {
     if (tribe.length < 2) {
-        return `${tribe[0]} spends the day alone.`;
+        return showImage(tribe[0]) + `${tribe[0]} spends the day alone.`;
     }
 
     const p1 = tribe[Math.floor(Math.random() * tribe.length)];
@@ -84,7 +85,15 @@ function randomEvent(tribe) {
 
     const event = events[Math.floor(Math.random() * events.length)];
     adjustRelationship(p1, p2, event.change);
-    return event.text;
+
+    return showImage(p1) + event.text;
+}
+
+function showImage(player) {
+    if (!photos[player]) {
+        return `<img class="contestant-photo" src="https://via.placeholder.com/80?text=No+Image">`;
+    }
+    return `<img class="contestant-photo" src="${photos[player]}">`;
 }
 
 function checkMerge() {
@@ -114,6 +123,7 @@ function showTrackRecord() {
     // HEADER ROW 1
     html += `<tr>
                 <th rowspan="2">Rank</th>
+                <th rowspan="2">Photo</th>
                 <th rowspan="2">Contestant</th>`;
 
     for (let i = 1; i <= totalEpisodes; i++) {
@@ -149,17 +159,17 @@ function showTrackRecord() {
     sortedPlayers.forEach(player => {
         html += `<tr>
                     <td>${stats[player].placement}</td>
+                    <td>${showImage(player)}</td>
                     <td>${player}</td>`;
 
         episodeResults.forEach(ep => {
             let result = ep.results[player] || "";
 
-            // Color coding
-            let bg = "#dddddd"; // blank = grey
-            if (result === "OUT") bg = "#ff9999";        // red
-            if (result === "IMM") bg = "#99ff99";        // bright green
-            if (result === "TIMM") bg = "#66cc66";       // darker green
-            if (result === "SAFE") bg = "white";         // white
+            let bg = "#dddddd";
+            if (result === "OUT") bg = "#ff9999";
+            if (result === "IMM") bg = "#99ff99";
+            if (result === "TIMM") bg = "#66cc66";
+            if (result === "SAFE") bg = "white";
 
             let display = result === "TIMM" ? "IMM" : result;
 
@@ -198,7 +208,7 @@ function runEpisode() {
     } else {
         immune = remaining[Math.floor(Math.random() * remaining.length)];
         stats[immune].immunityWins++;
-        html += `<p><strong>Individual Immunity:</strong> ${immune} wins immunity!</p>`;
+        html += showImage(immune) + `<p><strong>Individual Immunity:</strong> ${immune} wins immunity!</p>`;
     }
 
     // EVENTS
@@ -219,7 +229,7 @@ function runEpisode() {
 
     if (voters.length === 1) {
         eliminated = voters[0];
-        html += `<p>${eliminated} is automatically eliminated.</p>`;
+        html += showImage(eliminated) + `<p>${eliminated} is automatically eliminated.</p>`;
         stats[eliminated].placement = remaining.length;
 
         if (merged) tribes.Merged = [];
@@ -236,7 +246,7 @@ function runEpisode() {
 
         html += `<p><strong>Votes:</strong></p>`;
         for (const [voter, target] of Object.entries(votes)) {
-            html += `<p>${voter} voted for ${target}</p>`;
+            html += showImage(voter) + `<p>${voter} voted for ${target}</p>`;
         }
 
         let tally = {};
@@ -245,7 +255,7 @@ function runEpisode() {
         });
 
         eliminated = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
-        html += `<p><strong>${eliminated} is voted out.</strong></p>`;
+        html += showImage(eliminated) + `<p><strong>${eliminated} is voted out.</strong></p>`;
 
         stats[eliminated].votesReceived += tally[eliminated];
         stats[eliminated].placement = remaining.length;
@@ -262,9 +272,9 @@ function runEpisode() {
 
     remaining.forEach(p => {
         if (p === immune) {
-            epData.results[p] = "IMM"; // individual immunity
+            epData.results[p] = "IMM";
         } else if (!merged && tribes[losingTribe] && !tribes[losingTribe].includes(p)) {
-            epData.results[p] = "TIMM"; // tribal immunity
+            epData.results[p] = "TIMM";
         } else {
             epData.results[p] = "SAFE";
         }
@@ -280,7 +290,7 @@ function runEpisode() {
         const winner = finalRemaining[0];
         stats[winner].placement = 1;
 
-        html += `<h2>${winner} wins Survivor!</h2>`;
+        html += showImage(winner) + `<h2>${winner} wins Survivor!</h2>`;
         setLog(html);
 
         showTrackRecord();
@@ -295,7 +305,21 @@ function runEpisode() {
 
 document.getElementById("startBtn").onclick = () => {
     const input = document.getElementById("castInput").value.trim();
-    cast = input.split("\n").map(x => x.trim()).filter(x => x.length > 0);
+    const lines = input.split("\n");
+
+    cast = [];
+    photos = {};
+
+    lines.forEach(line => {
+        let parts = line.split(",");
+        let name = parts[0].trim();
+        let url = parts[1] ? parts[1].trim() : null;
+
+        if (name.length > 0) {
+            cast.push(name);
+            photos[name] = url || null;
+        }
+    });
 
     assignTribes();
     initRelationships(cast);
