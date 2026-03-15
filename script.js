@@ -404,6 +404,7 @@ function runEpisode() {
     setLog(html);
     episode++;
 }
+
 /* ============================================================
    MAIN MENU: CAST + STAT EDITOR + SETTINGS
    ============================================================ */
@@ -570,18 +571,10 @@ function openSettings() {
     document.getElementById("settingsMenu").style.display = "block";
 
     document.getElementById("finaleSetting").value = finaleSetting;
-
-    // OPTIONAL: If you add idol settings to your HTML later:
-    // document.getElementById("idolMode").value = idolMode;
-    // document.getElementById("idolExpire").value = idolExpireAt;
 }
 
 function saveSettings() {
     finaleSetting = document.getElementById("finaleSetting").value;
-
-    // OPTIONAL: If you add idol settings to your HTML later:
-    // idolMode = document.getElementById("idolMode").value;
-    // idolExpireAt = parseInt(document.getElementById("idolExpire").value, 10);
 
     document.getElementById("settingsMenu").style.display = "none";
     document.getElementById("mainMenu").style.display = "block";
