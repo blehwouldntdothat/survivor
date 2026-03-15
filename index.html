@@ -48,6 +48,24 @@
         </select>
     </div>
 
+    <div class="settingsBlock">
+        <label for="idolMode">Hidden Immunity Idols:</label>
+        <select id="idolMode">
+            <option value="none">No Idols</option>
+            <option value="one">One Idol Total</option>
+            <option value="tribes" selected>One Per Tribe (No Rehide)</option>
+        </select>
+    </div>
+
+    <div class="settingsBlock">
+        <label for="idolExpire">Idol Expiration:</label>
+        <select id="idolExpire">
+            <option value="4">Final 4</option>
+            <option value="5" selected>Final 5 (Default)</option>
+            <option value="6">Final 6</option>
+        </select>
+    </div>
+
     <button id="saveSettingsBtn">Save Settings & Return</button>
 </div>
 
@@ -71,12 +89,9 @@
     <div id="log"></div>
 </div>
 
-<!-- External modules -->
 <script src="events.js"></script>
 <script src="challenges.js"></script>
 <script src="tiebreakers.js"></script>
-
-<!-- Main logic -->
 <script src="script.js"></script>
 
 </body>
