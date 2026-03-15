@@ -139,7 +139,7 @@ function showTrackRecord() {
 
     html += `</tr>`;
 
-    // HEADER ROW 2 (MERGED PHASE CELLS)
+    // HEADER ROW 2 (PHASE CELLS)
     html += `<tr>`;
 
     let i = 0;
@@ -189,6 +189,33 @@ function showTrackRecord() {
     html += `</table>`;
 
     document.getElementById("log").innerHTML += html;
+}
+
+// ---- TIEBREAKER SYSTEM ----
+
+function runRandomCompetitionTiebreaker(tiedPlayers) {
+    const competitions = [
+        "Fire-making duel",
+        "Endurance challenge",
+        "Puzzle showdown",
+        "Balance challenge",
+        "Dexterity challenge",
+        "Memory challenge",
+        "Luck-based challenge",
+        "Speed challenge",
+        "Social duel",
+        "Random draw"
+    ];
+
+    const type = competitions[Math.floor(Math.random() * competitions.length)];
+    const loser = tiedPlayers[Math.floor(Math.random() * tiedPlayers.length)];
+
+    let html = "";
+    html += showImages(tiedPlayers);
+    html += `<p><strong>Tiebreaker Competition:</strong> ${type}!</p>`;
+    html += `<p>${loser} loses the tiebreaker and is eliminated.</p>`;
+
+    return { eliminated: loser, log: html };
 }
 
 function runEpisode() {
@@ -246,8 +273,8 @@ function runEpisode() {
         if (merged) tribes.Merged = [];
         else tribes[losingTribe] = [];
     } else {
+        // FIRST VOTE
         let votes = {};
-
         voters.forEach(voter => {
             let choices = voters.filter(p => p !== voter && p !== immune);
             let voteFor = choices[Math.floor(Math.random() * choices.length)];
@@ -266,11 +293,58 @@ function runEpisode() {
             tally[target] = (tally[target] || 0) + 1;
         });
 
-        eliminated = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
-        html += showImages([eliminated]) +
-            `<p><strong>${eliminated} is voted out.</strong></p>`;
+        let maxVotes = Math.max(...Object.values(tally));
+        let tied = Object.keys(tally).filter(p => tally[p] === maxVotes);
 
-        stats[eliminated].votesReceived += tally[eliminated];
+        if (tied.length === 1) {
+            // Clear loser
+            eliminated = tied[0];
+            html += showImages([eliminated]) +
+                `<p><strong>${eliminated} is voted out.</strong></p>`;
+        } else {
+            // TIE → REVOTE
+            html += `<p><strong>The vote is tied between ${tied.join(", ")}. They will revote.</strong></p>`;
+
+            let revoteVotes = {};
+            voters.forEach(voter => {
+                let choices = tied.filter(p => p !== voter && p !== immune);
+                if (choices.length === 0) {
+                    choices = tied.filter(p => p !== immune);
+                }
+                let voteFor = choices[Math.floor(Math.random() * choices.length)];
+                revoteVotes[voter] = voteFor;
+            });
+
+            html += `<p><strong>Revote:</strong></p>`;
+            for (const [voter, target] of Object.entries(revoteVotes)) {
+                html += showImages([voter, target]) +
+                    `<p>${voter} voted for ${target}</p>`;
+            }
+
+            let revoteTally = {};
+            Object.values(revoteVotes).forEach(target => {
+                revoteTally[target] = (revoteTally[target] || 0) + 1;
+            });
+
+            let revoteMax = Math.max(...Object.values(revoteTally));
+            let revoteTied = Object.keys(revoteTally).filter(p => revoteTally[p] === revoteMax);
+
+            if (revoteTied.length === 1) {
+                // Revote breaks tie
+                eliminated = revoteTied[0];
+                html += showImages([eliminated]) +
+                    `<p><strong>${eliminated} is voted out after the revote.</strong></p>`;
+            } else {
+                // DEADLOCK → RANDOM COMPETITION TIEBREAKER
+                html += `<p><strong>The revote is still tied. A random tiebreaker competition will decide who goes home.</strong></p>`;
+                const tb = runRandomCompetitionTiebreaker(revoteTied);
+                eliminated = tb.eliminated;
+                html += tb.log;
+            }
+        }
+
+        stats[eliminated].votesReceived += (tally[eliminated] || 0);
+
         stats[eliminated].placement = remaining.length;
 
         if (merged) {
@@ -284,7 +358,9 @@ function runEpisode() {
     let epData = { phase: merged ? "Merge" : "Pre-Merge", results: {} };
 
     remaining.forEach(p => {
-        if (p === immune) {
+        if (p === eliminated) {
+            epData.results[p] = "OUT";
+        } else if (p === immune) {
             epData.results[p] = "IMM";
         } else if (!merged && tribes[losingTribe] && !tribes[losingTribe].includes(p)) {
             epData.results[p] = "TIMM";
@@ -292,8 +368,6 @@ function runEpisode() {
             epData.results[p] = "SAFE";
         }
     });
-
-    if (eliminated) epData.results[eliminated] = "OUT";
 
     episodeResults.push(epData);
 
@@ -322,6 +396,10 @@ document.getElementById("startBtn").onclick = () => {
 
     cast = [];
     photos = {};
+    merged = false;
+    tribes = { A: [], B: [], Merged: [] };
+    episode = 1;
+    episodeResults = [];
 
     lines.forEach(line => {
         let parts = line.split(",");
