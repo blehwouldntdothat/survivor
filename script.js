@@ -122,11 +122,26 @@ function showTrackRecord() {
 
     html += `</tr>`;
 
-    // HEADER ROW 2 (PHASES)
+    // HEADER ROW 2 (MERGED PHASE CELLS)
     html += `<tr>`;
-    episodeResults.forEach(ep => {
-        html += `<td>${ep.phase}</td>`;
-    });
+
+    let i = 0;
+    while (i < episodeResults.length) {
+        let phase = episodeResults[i].phase;
+        let span = 1;
+
+        // Count consecutive identical phases
+        while (
+            i + span < episodeResults.length &&
+            episodeResults[i + span].phase === phase
+        ) {
+            span++;
+        }
+
+        html += `<td colspan="${span}" style="background:#ddd; font-weight:bold;">${phase}</td>`;
+        i += span;
+    }
+
     html += `</tr>`;
 
     // BODY ROWS (CONTESTANTS)
@@ -138,7 +153,15 @@ function showTrackRecord() {
                     <td>${player}</td>`;
 
         episodeResults.forEach(ep => {
-            html += `<td>${ep.results[player] || ""}</td>`;
+            let result = ep.results[player] || "";
+
+            // Color coding
+            let bg = "#dddddd"; // blank = grey
+            if (result === "OUT") bg = "#ff9999"; // red
+            if (result === "IMM") bg = "#99ff99"; // green
+            if (result === "SAFE") bg = "white"; // white
+
+            html += `<td style="background:${bg};">${result}</td>`;
         });
 
         html += `</tr>`;
