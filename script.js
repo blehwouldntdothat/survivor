@@ -1,8 +1,14 @@
 let cast = [];
 let tribes = { A: [], B: [], Merged: [] };
 let episode = 1;
+
+// MERGE RULES
 let merged = false;
-let relationships = {}; // relationships[player][otherPlayer] = score
+let mergeAt = Math.floor(Math.random() * 4) + 8; // 8–11 players
+let minMergeEpisode = 4 + Math.floor(Math.random() * 2); // episode 4 or 5
+
+// RELATIONSHIPS
+let relationships = {}; // relationships[player][other] = score
 
 function setLog(html) {
     document.getElementById("log").innerHTML = html;
@@ -61,13 +67,18 @@ function randomEvent(tribe) {
 
 function checkMerge() {
     const remaining = [...tribes.A, ...tribes.B];
-    if (!merged && remaining.length <= 10) {
+
+    if (!merged &&
+        remaining.length <= mergeAt &&
+        episode >= minMergeEpisode) {
+
         merged = true;
         tribes.Merged = remaining;
         tribes.A = [];
         tribes.B = [];
         return true;
     }
+
     return false;
 }
 
@@ -76,13 +87,10 @@ function runEpisode() {
 
     const remaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
 
-    // MERGE CHECK
+    // MERGE CHECK (but continue episode)
     if (checkMerge()) {
         html += `<h2>Merge!</h2>`;
         html += `<p>The tribes merge into one group.</p>`;
-        setLog(html);
-        episode++;
-        return;
     }
 
     // IMMUNITY
