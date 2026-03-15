@@ -8,3 +8,11 @@ body {
     align-items: center;
     text-align: center;
 }
+
+#log {
+    margin-top: 20px;
+    padding: 10px;
+    background: white;
+    border-radius: 6px;
+    width: 60%;
+}
