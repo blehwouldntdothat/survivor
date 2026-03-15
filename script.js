@@ -179,9 +179,13 @@ function showTrackRecord() {
             if (result === "IMM") bg = "#99ff99";
             if (result === "SAFE") bg = "white";
 
-            if (result === "TIE") bg = "#ffddaa";
-            if (result === "TIEBRK") {
+            if (result === "TIE") {
                 bg = "#ff8800";
+                color = "white";
+            }
+
+            if (result === "TIEBRK") {
+                bg = "#cc5500";
                 color = "white";
             }
 
@@ -368,6 +372,8 @@ function runEpisode() {
                 epData.results[p] = "OUT";
             } else if (p === immune) {
                 epData.results[p] = "IMM";
+            } else if (!merged && tribes[losingTribe] && !tribes[losingTribe].includes(p)) {
+                epData.results[p] = "IMM"; // TEAM IMMUNITY RESTORED
             } else {
                 epData.results[p] = "SAFE";
             }
