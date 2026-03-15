@@ -6,27 +6,35 @@ let cast = [];
 let tribes = { A: [], B: [], Merged: [] };
 let episode = 1;
 
+// MERGE RULES
 let merged = false;
 let mergeAt = Math.floor(Math.random() * 4) + 8;
 let minMergeEpisode = 4 + Math.floor(Math.random() * 2);
 
+// RELATIONSHIPS + STATS + EPISODE RESULTS + PHOTOS + JURY + FINALE
 let relationships = {};
 let stats = {};
 let episodeResults = [];
 let photos = {};
 let jury = [];
-let finaleSetting = "random";
 let finaleSize = null;
 let finaleFinalists = [];
 let finaleWinner = null;
 
+// SETTINGS
+let finaleSetting = "random";
+
 /* ============================================================
-   IDOL SYSTEM
+   HIDDEN IMMUNITY IDOL SYSTEM (NEW)
    ============================================================ */
 
-let idolMode = "tribes";       // "none", "one", "tribes"
-let idolExpireAt = 5;          // 4, 5, or 6
+// Idol mode: "none", "one", or "tribes"
+let idolMode = "tribes";
 
+// Idols expire at F4/F5/F6
+let idolExpireAt = 5;
+
+// Idol pools (whether an idol is hidden in each area)
 let idolPool = {
     A: false,
     B: false,
@@ -34,55 +42,51 @@ let idolPool = {
     global: false
 };
 
+// Who currently holds idols
 let idolsHeld = {}; // { playerName: true }
+
+// Whether idols have been placed this season
 let idolsPlaced = false;
 
 /* ============================================================
    BASIC HELPERS
    ============================================================ */
 
-function shuffle(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
+function setLog(html) {
+    document.getElementById("log").innerHTML = html;
 }
 
-function showImages(players) {
-    if (!players || players.length === 0) return "";
-    let html = `<div class="icon-grid">`;
-    players.forEach(p => {
-        const src = photos[p] || "";
-        if (src) {
-            html += `<img class="contestant-photo" src="${src}" alt="${p}">`;
-        } else {
-            html += `<div class="contestant-photo" style="background:#ddd;display:flex;align-items:center;justify-content:center;font-size:12px;">${p}</div>`;
-        }
-    });
-    html += `</div>`;
-    return html;
+function shuffle(arr) {
+    return arr.sort(() => Math.random() - 0.5);
+}
+
+function showImage(player) {
+    const src = photos[player] || "https://via.placeholder.com/80?text=No+Image";
+    return `<img class="contestant-photo" src="${src}" alt="${player}">`;
+}
+
+function showImages(playersArray) {
+    if (!playersArray || playersArray.length === 0) return "";
+    return `<div class="icon-grid">` +
+        playersArray.map(p => showImage(p)).join("") +
+        `</div>`;
 }
 
 /* ============================================================
-   SETTINGS
+   IDOL PLACEMENT (NEW)
    ============================================================ */
 
-function applySettings() {
-    finaleSetting = document.getElementById("finaleSetting").value;
-    idolMode = document.getElementById("idolMode").value;
-    idolExpireAt = parseInt(document.getElementById("idolExpire").value, 10);
+function resetIdolsForNewSeason() {
+    idolsPlaced = false;
+    idolsHeld = {};
+    idolPool = { A: false, B: false, Merged: false, global: false };
 }
-
-/* ============================================================
-   IDOL PLACEMENT
-   ============================================================ */
 
 function placeIdols() {
     idolsPlaced = true;
 
+    // Reset pools
     idolPool = { A: false, B: false, Merged: false, global: false };
-    idolsHeld = {};
 
     if (idolMode === "none") return;
 
@@ -104,14 +108,14 @@ function placeMergeIdol() {
 }
 
 /* ============================================================
-   IDOL FINDING (EVENT-BASED)
+   IDOL FINDING (NEW)
    ============================================================ */
 
 function attemptIdolFind(tribePlayers, tribeName) {
     if (idolMode === "none") return "";
     if (!idolPool[tribeName] && !idolPool.global) return "";
 
-    let foundHTML = "";
+    let html = "";
 
     tribePlayers.forEach(player => {
         if (idolsHeld[player]) return;
@@ -125,7 +129,7 @@ function attemptIdolFind(tribePlayers, tribeName) {
             if (idolPool[tribeName]) idolPool[tribeName] = false;
             else if (idolPool.global) idolPool.global = false;
 
-            foundHTML += `
+            html += `
                 <div class="idolFoundBox">
                     ⭐ <strong>${player} found a Hidden Immunity Idol!</strong>
                 </div>
@@ -133,238 +137,108 @@ function attemptIdolFind(tribePlayers, tribeName) {
         }
     });
 
-    return foundHTML;
+    return html;
 }
 
 function runEventWithIdols(tribePlayers, tribeName) {
     let html = "";
     html += attemptIdolFind(tribePlayers, tribeName);
-    html += runEvent(tribePlayers); // from events.js
+    html += runEvent(tribePlayers);
     return html;
 }
 
 /* ============================================================
-   IDOL PLAY LOGIC
+   IDOL EXPIRATION (NEW)
    ============================================================ */
-
-function shouldPlayIdol(player, voters, immune) {
-    if (!idolsHeld[player]) return false;
-
-    const remaining = [...tribes.A, ...tribes.B, ...tribes.Merged].length;
-    if (remaining <= idolExpireAt) {
-        return true;
-    }
-
-    if (player === immune) return false;
-
-    let dangerScore = 0;
-    voters.forEach(v => {
-        if (v === player) return;
-        const rel = relationships[v]?.[player] ?? 50;
-        if (rel < 40) dangerScore += 1;
-        if (rel < 25) dangerScore += 1;
-    });
-
-    if (dangerScore >= Math.floor(voters.length / 3)) {
-        return true;
-    }
-
-    const chaosChance = 0.05 + (stats[player].temperament * 0.01);
-    if (Math.random() < chaosChance) {
-        return true;
-    }
-
-    return false;
-}
-
-function handleIdolPlay(voters, immune) {
-    let html = "";
-    let playedBy = null;
-
-    voters.forEach(player => {
-        if (playedBy) return;
-        if (!idolsHeld[player]) return;
-
-        if (shouldPlayIdol(player, voters, immune)) {
-            playedBy = player;
-            delete idolsHeld[player];
-
-            html += `
-                <div class="idolFoundBox" style="background: rgba(255,150,80,0.2); color:#b33;">
-                    🛡️ <strong>${player} plays a Hidden Immunity Idol!</strong>
-                </div>
-            `;
-        }
-    });
-
-    return { playedBy, html };
-}
-
-function nullifyVotes(votes, idolPlayer) {
-    if (!idolPlayer) return { newVotes: votes, nullifiedCount: 0 };
-
-    let newVotes = {};
-    let nullified = 0;
-
-    for (const [voter, target] of Object.entries(votes)) {
-        if (target === idolPlayer) {
-            nullified++;
-            newVotes[voter] = null;
-        } else {
-            newVotes[voter] = target;
-        }
-    }
-
-    return { newVotes, nullifiedCount: nullified };
-}
-
-/* ============================================================
-   MERGE IDOL + RESET + EXPIRATION
-   ============================================================ */
-
-function checkAndPlaceMergeIdol() {
-    if (idolMode !== "tribes") return;
-    if (!merged) return;
-    if (idolPool.Merged) return;
-    idolPool.Merged = true;
-}
-
-function resetIdolsForNewSeason() {
-    idolsPlaced = false;
-    idolPool = { A: false, B: false, Merged: false, global: false };
-    idolsHeld = {};
-}
 
 function disableExpiredIdols() {
     const remaining = [...tribes.A, ...tribes.B, ...tribes.Merged].length;
+
     if (remaining <= idolExpireAt) {
         idolsHeld = {};
         idolPool = { A: false, B: false, Merged: false, global: false };
     }
 }
-
 /* ============================================================
-   RELATIONSHIPS + STATS INIT
-   ============================================================ */
-
-function initRelationships() {
-    relationships = {};
-    cast.forEach(a => {
-        relationships[a] = {};
-        cast.forEach(b => {
-            if (a === b) return;
-            relationships[a][b] = 40 + Math.floor(Math.random() * 21);
-        });
-    });
-}
-
-function initStats() {
-    stats = {};
-    cast.forEach(name => {
-        stats[name] = {
-            physical: 3,
-            mental: 3,
-            social: 3,
-            strategy: 3,
-            loyalty: 3,
-            temperament: 3,
-            luck: 3,
-            placement: null,
-            eliminatedEpisode: null,
-            votesReceived: 0,
-            votesCast: []
-        };
-    });
-}
-
-/* ============================================================
-   TRIBE ASSIGNMENT
-   ============================================================ */
-
-function assignTribes() {
-    tribes = { A: [], B: [], Merged: [] };
-    merged = false;
-    jury = [];
-    episode = 1;
-
-    let shuffled = shuffle([...cast]);
-    const half = Math.ceil(shuffled.length / 2);
-    tribes.A = shuffled.slice(0, half);
-    tribes.B = shuffled.slice(half);
-}
-
-/* ============================================================
-   MERGE CHECK
-   ============================================================ */
-
-function checkMerge() {
-    if (merged) return false;
-
-    const remaining = [...tribes.A, ...tribes.B];
-
-    if (!merged &&
-        remaining.length <= mergeAt &&
-        episode >= minMergeEpisode) {
-
-        merged = true;
-        tribes.Merged = remaining;
-        tribes.A = [];
-        tribes.B = [];
-
-        checkAndPlaceMergeIdol();
-
-        return true;
-    }
-
-    return false;
-}
-
-/* ============================================================
-   EPISODE RUNNER
+   MAIN EPISODE LOOP
    ============================================================ */
 
 function runEpisode() {
-    const log = document.getElementById("log");
     let html = `<h3>Episode ${episode}</h3>`;
 
+    recordTribeHistory();
+
+    // IDOL EXPIRATION CHECK (NEW)
     disableExpiredIdols();
 
-    let currentRemaining = merged ? tribes.Merged : [...tribes.A, ...tribes.B];
+    const remaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
 
-    if (currentRemaining.length <= 2) {
-        html += `<p>Finale reached.</p>`;
-        log.innerHTML += html;
+    if (!finaleSize) {
+        if (finaleSetting === "f2") finaleSize = 2;
+        else if (finaleSetting === "f3") finaleSize = 3;
+        else finaleSize = Math.random() < 0.5 ? 2 : 3;
+    }
+
+    if (remaining.length === finaleSize) {
+        runFinale(remaining);
         return;
     }
 
-    if (!merged) {
-        html += `<h4>Tribes</h4>`;
-        html += `<p><strong>Tribe A:</strong> ${tribes.A.join(", ")}</p>`;
-        html += `<p><strong>Tribe B:</strong> ${tribes.B.join(", ")}</p>`;
-    } else {
-        html += `<h4>Merged Tribe</h4>`;
-        html += `<p>${tribes.Merged.join(", ")}</p>`;
+    if (checkMerge()) {
+        html += `<h2>Merge!</h2>`;
+        html += `<p>The tribes merge into one group.</p>`;
+
+        // PLACE MERGE IDOL (NEW)
+        placeMergeIdol();
     }
 
-    // Challenge
-    html += `<h4>Immunity Challenge</h4>`;
-    let losingTribe = null;
+    const currentRemaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
+
     let immune = null;
+    let losingTribe = null;
+    let challenge = getRandomChallenge(merged ? "merge" : "tribe");
 
     if (!merged) {
-        const result = runTribalChallenge(tribes.A, tribes.B, stats); // from challenges.js
-        losingTribe = result.loser;
-        html += result.log;
+        const tribeAScore = challenge ? computeTribeScore(tribes.A, challenge.weights) : Math.random();
+        const tribeBScore = challenge ? computeTribeScore(tribes.B, challenge.weights) : Math.random();
+
+        const winning = tribeAScore > tribeBScore ? "A" : "B";
+        losingTribe = winning === "A" ? "B" : "A";
+        const winningMembers = winning === "A" ? tribes.A : tribes.B;
+
+        if (challenge) {
+            html += `<p><strong>Immunity Challenge:</strong> ${challenge.name}</p>`;
+            html += `<p>${challenge.description}</p>`;
+        }
+
+        html += showImages(winningMembers) +
+            `<p>Tribe ${winning} wins immunity.</p>`;
     } else {
-        const result = runIndividualChallenge(currentRemaining, stats); // from challenges.js
-        immune = result.winner;
-        html += result.log;
+        if (!challenge) {
+            immune = currentRemaining[Math.floor(Math.random() * currentRemaining.length)];
+        } else {
+            let scores = currentRemaining.map(p => ({
+                player: p,
+                score: computePlayerScore(p, challenge.weights)
+            }));
+            scores.sort((a, b) => b.score - a.score);
+
+            const topScore = scores[0].score;
+            const topPlayers = scores.filter(s => s.score === topScore).map(s => s.player);
+            immune = topPlayers[Math.floor(Math.random() * topPlayers.length)];
+
+            html += `<p><strong>Immunity Challenge:</strong> ${challenge.name}</p>`;
+            html += `<p>${challenge.description}</p>`;
+        }
+
+        stats[immune].immunityWins++;
+        html += showImages([immune]) +
+            `<p><strong>Individual Immunity:</strong> ${immune} wins immunity.</p>`;
     }
 
-    // Events
     html += `<h4>Post-Challenge Events</h4>`;
-
     if (!merged) {
+        // IDOL-FINDING EVENTS (NEW)
         html += `<p>${runEventWithIdols(tribes.A, "A")}</p>`;
         html += `<p>${runEventWithIdols(tribes.B, "B")}</p>`;
     } else {
@@ -372,7 +246,6 @@ function runEpisode() {
         html += `<p>${runEventWithIdols(currentRemaining, "Merged")}</p>`;
     }
 
-    // Tribal Council
     html += `<h4>Tribal Council</h4>`;
 
     let voters = merged ? currentRemaining : tribes[losingTribe];
@@ -387,8 +260,12 @@ function runEpisode() {
 
         if (merged) tribes.Merged = [];
         else tribes[losingTribe] = [];
-
     } else {
+
+        /* ============================================================
+           VOTING
+           ============================================================ */
+
         let votes = {};
         voters.forEach(voter => {
             let choices = voters.filter(p => p !== voter && p !== immune);
@@ -408,8 +285,8 @@ function runEpisode() {
             });
 
             weightedChoices.sort((a, b) => b.weight - a.weight);
-            let voteFor = weightedChoices[0].player;
 
+            let voteFor = weightedChoices[0].player;
             votes[voter] = voteFor;
             stats[voter].votesCast.push(voteFor);
         });
@@ -420,6 +297,10 @@ function runEpisode() {
                 `<p>${voter} voted for ${target}</p>`;
         }
 
+        /* ============================================================
+           IDOL PLAY (NEW)
+           ============================================================ */
+
         const idolResult = handleIdolPlay(voters, immune);
         html += idolResult.html;
 
@@ -428,6 +309,10 @@ function runEpisode() {
         if (idolResult.playedBy) {
             html += `<p><strong>${nullifiedCount} vote(s) against ${idolResult.playedBy} do not count.</strong></p>`;
         }
+
+        /* ============================================================
+           TALLY VOTES (WITH IDOLS)
+           ============================================================ */
 
         let tally = {};
         voters.forEach(p => tally[p] = 0);
@@ -438,8 +323,7 @@ function runEpisode() {
             }
         }
 
-        let sorted = Object.entries(tally)
-            .sort((a, b) => b[1] - a[1]);
+        let sorted = Object.entries(tally).sort((a, b) => b[1] - a[1]);
 
         let highestVotes = sorted[0][1];
         let highestPlayers = sorted.filter(e => e[1] === highestVotes).map(e => e[0]);
@@ -447,29 +331,43 @@ function runEpisode() {
         let secondHighestVotes = sorted.find(e => e[1] < highestVotes)?.[1] ?? 0;
         let secondHighestPlayers = sorted.filter(e => e[1] === secondHighestVotes).map(e => e[0]);
 
+        /* ============================================================
+           ELIMINATION LOGIC (WITH IDOLS)
+           ============================================================ */
+
         if (idolResult.playedBy && highestPlayers.includes(idolResult.playedBy)) {
+
+            // Idol protected the top vote-getter → eliminate second-highest
             if (secondHighestPlayers.length === 1) {
                 eliminated = secondHighestPlayers[0];
                 html += showImages([eliminated]) +
                     `<p><strong>${eliminated} is eliminated with the second-highest votes.</strong></p>`;
             } else {
                 html += `<p><strong>There is a tie for second-highest votes.</strong></p>`;
-                const tb = runRandomCompetitionTiebreaker(secondHighestPlayers); // from tiebreakers.js
+                const tb = runRandomCompetitionTiebreaker(secondHighestPlayers);
                 eliminated = tb.eliminated;
                 html += tb.log;
             }
 
         } else if (highestPlayers.length === 1) {
+
+            // Normal elimination
             eliminated = highestPlayers[0];
             html += showImages([eliminated]) +
                 `<p><strong>${eliminated} is voted out.</strong></p>`;
 
         } else {
+
+            // Tie → tiebreaker
             html += `<p><strong>The vote is tied between ${highestPlayers.join(", ")}.</strong></p>`;
             const tb = runRandomCompetitionTiebreaker(highestPlayers);
             eliminated = tb.eliminated;
             html += tb.log;
         }
+
+        /* ============================================================
+           RECORD ELIMINATION
+           ============================================================ */
 
         stats[eliminated].votesReceived += tally[eliminated];
         stats[eliminated].placement = currentRemaining.length;
@@ -484,6 +382,10 @@ function runEpisode() {
             tribes[losingTribe] = voters.filter(p => p !== eliminated);
         }
 
+        /* ============================================================
+           EPISODE TRACK RECORD
+           ============================================================ */
+
         let epData = { phase: merged ? "Merge" : "Pre-Merge", results: {} };
 
         currentRemaining.forEach(p => {
@@ -496,112 +398,85 @@ function runEpisode() {
             }
         });
 
-        if (idolResult.playedBy) {
-            epData.results[idolResult.playedBy] = "IMM";
-        }
-
         episodeResults.push(epData);
     }
 
-    checkMerge();
-
+    setLog(html);
     episode++;
-    log.innerHTML += html;
 }
-
 /* ============================================================
-   UI: CAST SETUP
+   MAIN MENU: CAST + STAT EDITOR + SETTINGS
    ============================================================ */
 
-const addContestantBtn = document.getElementById("addContestantBtn");
-const castListDiv = document.getElementById("castList");
-const startBtn = document.getElementById("startBtn");
-const editStatsBtn = document.getElementById("editStatsBtn");
-const settingsBtn = document.getElementById("settingsBtn");
-const saveSettingsBtn = document.getElementById("saveSettingsBtn");
-const saveStatsBtn = document.getElementById("saveStatsBtn");
-const nextEpisodeBtn = document.getElementById("nextEpisodeBtn");
+function renderCastList() {
+    const container = document.getElementById("castList");
+    container.innerHTML = "";
 
-const mainMenuDiv = document.getElementById("mainMenu");
-const statEditorDiv = document.getElementById("statEditor");
-const settingsMenuDiv = document.getElementById("settingsMenu");
-const gameDiv = document.getElementById("game");
+    cast.forEach(name => {
+        const card = document.createElement("div");
+        card.className = "castCard";
 
-addContestantBtn.onclick = () => {
+        const img = document.createElement("img");
+        img.src = photos[name] || "https://via.placeholder.com/80?text=No+Image";
+        img.alt = name;
+
+        const label = document.createElement("div");
+        label.textContent = name;
+
+        const removeBtn = document.createElement("button");
+        removeBtn.textContent = "Remove";
+        removeBtn.onclick = () => {
+            cast = cast.filter(n => n !== name);
+            delete photos[name];
+            delete stats[name];
+            delete relationships[name];
+            renderCastList();
+        };
+
+        card.appendChild(img);
+        card.appendChild(label);
+        card.appendChild(removeBtn);
+        container.appendChild(card);
+    });
+}
+
+function addContestant() {
     const nameInput = document.getElementById("newName");
     const photoInput = document.getElementById("newPhoto");
+
     const name = nameInput.value.trim();
-    const photo = photoInput.value.trim();
+    const url = photoInput.value.trim();
 
     if (!name) return;
 
-    cast.push(name);
-    if (photo) photos[name] = photo;
+    if (!cast.includes(name)) {
+        cast.push(name);
+        photos[name] = url || null;
+    } else {
+        photos[name] = url || photos[name] || null;
+    }
 
     nameInput.value = "";
     photoInput.value = "";
 
     renderCastList();
-};
-
-function renderCastList() {
-    castListDiv.innerHTML = "";
-    cast.forEach(name => {
-        const card = document.createElement("div");
-        card.className = "castCard";
-
-        const imgSrc = photos[name] || "";
-        if (imgSrc) {
-            card.innerHTML = `
-                <img src="${imgSrc}" class="contestant-photo" alt="${name}">
-                <p>${name}</p>
-                <button data-name="${name}">Remove</button>
-            `;
-        } else {
-            card.innerHTML = `
-                <div class="contestant-photo" style="background:#ddd;display:flex;align-items:center;justify-content:center;">${name}</div>
-                <p>${name}</p>
-                <button data-name="${name}">Remove</button>
-            `;
-        }
-
-        const btn = card.querySelector("button");
-        btn.onclick = () => {
-            cast = cast.filter(c => c !== name);
-            delete photos[name];
-            renderCastList();
-        };
-
-        castListDiv.appendChild(card);
-    });
 }
 
-/* ============================================================
-   UI: SETTINGS
-   ============================================================ */
-
-settingsBtn.onclick = () => {
-    mainMenuDiv.style.display = "none";
-    settingsMenuDiv.style.display = "block";
-};
-
-saveSettingsBtn.onclick = () => {
-    applySettings();
-    settingsMenuDiv.style.display = "none";
-    mainMenuDiv.style.display = "block";
-};
-
-/* ============================================================
-   UI: STATS EDITOR
-   ============================================================ */
-
-editStatsBtn.onclick = () => {
+function openStatEditor() {
     if (cast.length === 0) return;
 
-    if (Object.keys(stats).length === 0) {
-        initStats();
-    }
+    initRelationships(cast);
+    initStats(cast);
 
+    document.getElementById("mainMenu").style.display = "none";
+    document.getElementById("settingsMenu").style.display = "none";
+    document.getElementById("game").style.display = "none";
+    document.getElementById("statEditor").style.display = "block";
+
+    renderStatEditor();
+}
+
+function renderStatEditor() {
     const container = document.getElementById("statEditorContent");
     container.innerHTML = "";
 
@@ -609,167 +484,166 @@ editStatsBtn.onclick = () => {
         const block = document.createElement("div");
         block.className = "statBlock";
 
-        const imgSrc = photos[name] || "";
-        block.innerHTML = `
-            <div class="statHeader">
-                ${imgSrc ? `<img src="${imgSrc}" alt="${name}">` : `<div class="contestant-photo" style="background:#ddd;display:flex;align-items:center;justify-content:center;">${name}</div>`}
-                <h3>${name}</h3>
-            </div>
-            <div class="statRow">
-                <label>Physical:</label>
-                <select data-name="${name}" data-stat="physical">${statOptions(stats[name].physical)}</select>
-                <label>Mental:</label>
-                <select data-name="${name}" data-stat="mental">${statOptions(stats[name].mental)}</select>
-                <label>Social:</label>
-                <select data-name="${name}" data-stat="social">${statOptions(stats[name].social)}</select>
-            </div>
-            <div class="statRow">
-                <label>Strategy:</label>
-                <select data-name="${name}" data-stat="strategy">${statOptions(stats[name].strategy)}</select>
-                <label>Loyalty:</label>
-                <select data-name="${name}" data-stat="loyalty">${statOptions(stats[name].loyalty)}</select>
-                <label>Temperament:</label>
-                <select data-name="${name}" data-stat="temperament">${statOptions(stats[name].temperament)}</select>
-            </div>
-            <div class="statRow">
-                <label>Luck:</label>
-                <select data-name="${name}" data-stat="luck">${statOptions(stats[name].luck)}</select>
-            </div>
-        `;
+        const header = document.createElement("div");
+        header.className = "statHeader";
+
+        const img = document.createElement("img");
+        img.src = photos[name] || "https://via.placeholder.com/80?text=No+Image";
+        img.alt = name;
+
+        const title = document.createElement("div");
+        title.textContent = name;
+
+        header.appendChild(img);
+        header.appendChild(title);
+        block.appendChild(header);
+
+        const row1 = document.createElement("div");
+        row1.className = "statRow";
+        row1.appendChild(makeStatField(name, "physical", "Physical"));
+        row1.appendChild(makeStatField(name, "endurance", "Endurance"));
+        row1.appendChild(makeStatField(name, "mental", "Mental"));
+        row1.appendChild(makeStatField(name, "social", "Social"));
+
+        const row2 = document.createElement("div");
+        row2.className = "statRow";
+        row2.appendChild(makeStatField(name, "temperament", "Temperament"));
+        row2.appendChild(makeStatField(name, "luck", "Luck"));
+        row2.appendChild(makeStatField(name, "strategy", "Strategy"));
+        row2.appendChild(makeStatField(name, "loyalty", "Loyalty"));
+
+        block.appendChild(row1);
+        block.appendChild(row2);
 
         container.appendChild(block);
     });
-
-    mainMenuDiv.style.display = "none";
-    statEditorDiv.style.display = "block";
-};
-
-function statOptions(selected) {
-    let html = "";
-    for (let i = 1; i <= 5; i++) {
-        html += `<option value="${i}" ${i === selected ? "selected" : ""}>${i}</option>`;
-    }
-    return html;
 }
 
-saveStatsBtn.onclick = () => {
-    const selects = statEditorDiv.querySelectorAll("select[data-name]");
+function makeStatField(name, key, labelText) {
+    const wrapper = document.createElement("div");
+
+    const label = document.createElement("label");
+    label.textContent = labelText + ":";
+
+    const select = document.createElement("select");
+    select.dataset.player = name;
+    select.dataset.stat = key;
+
+    for (let i = 1; i <= 5; i++) {
+        const opt = document.createElement("option");
+        opt.value = i;
+        opt.textContent = i;
+        if ((stats[name] && stats[name][key] === i) || (!stats[name] && i === 3)) {
+            opt.selected = true;
+        }
+        select.appendChild(opt);
+    }
+
+    wrapper.appendChild(label);
+    wrapper.appendChild(select);
+    return wrapper;
+}
+
+function saveStatsAndReturn() {
+    const selects = document.querySelectorAll("#statEditorContent select");
     selects.forEach(sel => {
-        const name = sel.getAttribute("data-name");
-        const stat = sel.getAttribute("data-stat");
-        const val = parseInt(sel.value, 10);
-        stats[name][stat] = val;
+        const player = sel.dataset.player;
+        const key = sel.dataset.stat;
+        const value = parseInt(sel.value, 10);
+
+        if (!stats[player]) stats[player] = {};
+        stats[player][key] = value;
     });
 
-    statEditorDiv.style.display = "none";
-    mainMenuDiv.style.display = "block";
-};
+    document.getElementById("statEditor").style.display = "none";
+    document.getElementById("mainMenu").style.display = "block";
+}
+
+/* ============================================================
+   SETTINGS MENU
+   ============================================================ */
+
+function openSettings() {
+    document.getElementById("mainMenu").style.display = "none";
+    document.getElementById("statEditor").style.display = "none";
+    document.getElementById("game").style.display = "none";
+    document.getElementById("settingsMenu").style.display = "block";
+
+    document.getElementById("finaleSetting").value = finaleSetting;
+
+    // OPTIONAL: If you add idol settings to your HTML later:
+    // document.getElementById("idolMode").value = idolMode;
+    // document.getElementById("idolExpire").value = idolExpireAt;
+}
+
+function saveSettings() {
+    finaleSetting = document.getElementById("finaleSetting").value;
+
+    // OPTIONAL: If you add idol settings to your HTML later:
+    // idolMode = document.getElementById("idolMode").value;
+    // idolExpireAt = parseInt(document.getElementById("idolExpire").value, 10);
+
+    document.getElementById("settingsMenu").style.display = "none";
+    document.getElementById("mainMenu").style.display = "block";
+}
 
 /* ============================================================
    START SEASON
    ============================================================ */
 
-startBtn.onclick = () => {
-    if (cast.length < 4) return;
+document.getElementById("addContestantBtn").onclick = addContestant;
+document.getElementById("editStatsBtn").onclick = openStatEditor;
+document.getElementById("settingsBtn").onclick = openSettings;
+document.getElementById("saveSettingsBtn").onclick = saveSettings;
+document.getElementById("saveStatsBtn").onclick = saveStatsAndReturn;
 
-    applySettings();
-    resetIdolsForNewSeason();
+document.getElementById("startBtn").onclick = () => {
+    if (cast.length === 0) return;
 
-    initRelationships();
-    initStats();
-    assignTribes();
-    placeIdols();
-
-    mainMenuDiv.style.display = "none";
-    gameDiv.style.display = "block";
-
-    document.getElementById("log").innerHTML = "";
+    merged = false;
+    tribes = { A: [], B: [], Merged: [] };
+    episode = 1;
     episodeResults = [];
     jury = [];
+    finaleSize = null;
+    finaleFinalists = [];
     finaleWinner = null;
-};
 
-nextEpisodeBtn.onclick = () => {
-    runEpisode();
-};
+    initRelationships(cast);
+    initStats(cast);
 
-/* ============================================================
-   TRACK RECORD + FINALE
-   ============================================================ */
+    // RESET IDOLS (NEW)
+    resetIdolsForNewSeason();
 
-function buildTrackRecordTable() {
-    let html = `<h3>Track Record</h3>`;
-    html += `<table border="1" cellpadding="6"><tr><th>Player</th>`;
-
-    episodeResults.forEach((ep, i) => {
-        html += `<th>Ep ${i + 1}</th>`;
-    });
-
-    html += `</tr>`;
-
-    cast.forEach(player => {
-        html += `<tr><td>${player}</td>`;
-        episodeResults.forEach(ep => {
-            let val = ep.results[player] || "";
-            html += `<td>${val}</td>`;
-        });
-        html += `</tr>`;
-    });
-
-    html += `</table>`;
-    return html;
-}
-
-function runFinale() {
-    const log = document.getElementById("log");
-    let html = `<h3>Finale</h3>`;
-
-    let finalists = tribes.Merged;
-
-    html += `<p><strong>Finalists:</strong> ${finalists.join(", ")}</p>`;
-    html += showImages(finalists);
-
-    let votes = {};
-    finalists.forEach(f => votes[f] = 0);
-
-    jury.forEach(juror => {
-        let weighted = finalists.map(f => {
-            const rel = relationships[juror]?.[f] ?? 50;
-            const weight = rel + stats[f].social * 5 + stats[f].strategy * 3;
-            return { f, weight };
-        });
-
-        weighted.sort((a, b) => b.weight - a.weight);
-        votes[weighted[0].f]++;
-    });
-
-    html += `<h4>Final Jury Votes</h4>`;
-    finalists.forEach(f => {
-        html += `<p>${f}: ${votes[f]} vote(s)</p>`;
-    });
-
-    finalists.sort((a, b) => votes[b] - votes[a]);
-    finaleWinner = finalists[0];
-
-    html += `<h2>🏆 ${finaleWinner} wins Survivor!</h2>`;
-    html += showImages([finaleWinner]);
-
-    html += buildTrackRecordTable();
-
-    log.innerHTML += html;
-}
-
-/* ============================================================
-   ENDGAME CHECK
-   ============================================================ */
-
-function checkForFinale() {
-    const remaining = tribes.Merged.length;
-
-    if (remaining <= 3) {
-        runFinale();
-        return true;
+    if (cast.length < 10) {
+        merged = true;
+        tribes.A = [];
+        tribes.B = [];
+        tribes.Merged = [...cast];
+    } else {
+        assignTribes();
     }
 
-    return false;
-}
+    // PLACE INITIAL IDOLS (NEW)
+    placeIdols();
+
+    document.getElementById("mainMenu").style.display = "none";
+    document.getElementById("statEditor").style.display = "none";
+    document.getElementById("settingsMenu").style.display = "none";
+    document.getElementById("game").style.display = "block";
+
+    if (merged) {
+        setLog(`
+            <h3>Season Begins!</h3>
+            <p>The game begins at the <strong>Merge</strong> due to a small cast (${cast.length} players).</p>
+        `);
+    } else {
+        setLog(`
+            <h3>Season Begins!</h3>
+            <p><strong>Tribe A:</strong> ${tribes.A.join(", ")}</p>
+            <p><strong>Tribe B:</strong> ${tribes.B.join(", ")}</p>
+        `);
+    }
+};
+
+document.getElementById("nextEpisodeBtn").onclick = runEpisode;
