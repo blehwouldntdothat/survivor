@@ -44,17 +44,3 @@ table img.contestant-photo {
     margin-right: auto;
 }
 
-/* TIE = dark orange */
-.td-tie {
-    background: #ff8800;
-    color: white;
-    font-weight: bold;
-}
-
-/* TIEBRK = even darker orange */
-.td-tiebrk {
-    background: #cc5500;
-    color: white;
-    font-weight: bold;
-}
-
