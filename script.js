@@ -6,98 +6,275 @@ let cast = [];
 let tribes = { A: [], B: [], Merged: [] };
 let episode = 1;
 
-// MERGE RULES
 let merged = false;
 let mergeAt = Math.floor(Math.random() * 4) + 8;
 let minMergeEpisode = 4 + Math.floor(Math.random() * 2);
 
-// RELATIONSHIPS + STATS + EPISODE RESULTS + PHOTOS + JURY + FINALE
 let relationships = {};
 let stats = {};
 let episodeResults = [];
 let photos = {};
 let jury = [];
+let finaleSetting = "random";
 let finaleSize = null;
 let finaleFinalists = [];
 let finaleWinner = null;
 
-// SETTINGS
-let finaleSetting = "random";
+/* ============================================================
+   IDOL SYSTEM
+   ============================================================ */
+
+let idolMode = "tribes";       // "none", "one", "tribes"
+let idolExpireAt = 5;          // 4, 5, or 6
+
+let idolPool = {
+    A: false,
+    B: false,
+    Merged: false,
+    global: false
+};
+
+let idolsHeld = {}; // { playerName: true }
+let idolsPlaced = false;
 
 /* ============================================================
    BASIC HELPERS
    ============================================================ */
 
-function setLog(html) {
-    document.getElementById("log").innerHTML = html;
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
 }
 
-function shuffle(arr) {
-    return arr.sort(() => Math.random() - 0.5);
-}
-
-function showImage(player) {
-    const src = photos[player] || "https://via.placeholder.com/80?text=No+Image";
-    return `<img class="contestant-photo" src="${src}" alt="${player}">`;
-}
-
-function showImages(playersArray) {
-    if (!playersArray || playersArray.length === 0) return "";
-    return `<div class="icon-grid">` +
-        playersArray.map(p => showImage(p)).join("") +
-        `</div>`;
+function showImages(players) {
+    if (!players || players.length === 0) return "";
+    let html = `<div class="icon-grid">`;
+    players.forEach(p => {
+        const src = photos[p] || "";
+        if (src) {
+            html += `<img class="contestant-photo" src="${src}" alt="${p}">`;
+        } else {
+            html += `<div class="contestant-photo" style="background:#ddd;display:flex;align-items:center;justify-content:center;font-size:12px;">${p}</div>`;
+        }
+    });
+    html += `</div>`;
+    return html;
 }
 
 /* ============================================================
-   RELATIONSHIPS + STATS
+   SETTINGS
    ============================================================ */
 
-function initRelationships(players) {
-    players.forEach(p => {
-        relationships[p] = {};
-        players.forEach(o => {
-            if (p !== o) {
-                relationships[p][o] = 40 + Math.floor(Math.random() * 20);
-            }
+function applySettings() {
+    finaleSetting = document.getElementById("finaleSetting").value;
+    idolMode = document.getElementById("idolMode").value;
+    idolExpireAt = parseInt(document.getElementById("idolExpire").value, 10);
+}
+
+/* ============================================================
+   IDOL PLACEMENT
+   ============================================================ */
+
+function placeIdols() {
+    idolsPlaced = true;
+
+    idolPool = { A: false, B: false, Merged: false, global: false };
+    idolsHeld = {};
+
+    if (idolMode === "none") return;
+
+    if (idolMode === "one") {
+        idolPool.global = true;
+        return;
+    }
+
+    if (idolMode === "tribes") {
+        if (tribes.A.length > 0) idolPool.A = true;
+        if (tribes.B.length > 0) idolPool.B = true;
+    }
+}
+
+function placeMergeIdol() {
+    if (idolMode !== "tribes") return;
+    if (idolPool.Merged) return;
+    idolPool.Merged = true;
+}
+
+/* ============================================================
+   IDOL FINDING (EVENT-BASED)
+   ============================================================ */
+
+function attemptIdolFind(tribePlayers, tribeName) {
+    if (idolMode === "none") return "";
+    if (!idolPool[tribeName] && !idolPool.global) return "";
+
+    let foundHTML = "";
+
+    tribePlayers.forEach(player => {
+        if (idolsHeld[player]) return;
+
+        const luck = stats[player]?.luck ?? 3;
+        const chance = 0.03 + (luck * 0.01);
+
+        if (Math.random() < chance) {
+            idolsHeld[player] = true;
+
+            if (idolPool[tribeName]) idolPool[tribeName] = false;
+            else if (idolPool.global) idolPool.global = false;
+
+            foundHTML += `
+                <div class="idolFoundBox">
+                    ⭐ <strong>${player} found a Hidden Immunity Idol!</strong>
+                </div>
+            `;
+        }
+    });
+
+    return foundHTML;
+}
+
+function runEventWithIdols(tribePlayers, tribeName) {
+    let html = "";
+    html += attemptIdolFind(tribePlayers, tribeName);
+    html += runEvent(tribePlayers); // from events.js
+    return html;
+}
+
+/* ============================================================
+   IDOL PLAY LOGIC
+   ============================================================ */
+
+function shouldPlayIdol(player, voters, immune) {
+    if (!idolsHeld[player]) return false;
+
+    const remaining = [...tribes.A, ...tribes.B, ...tribes.Merged].length;
+    if (remaining <= idolExpireAt) {
+        return true;
+    }
+
+    if (player === immune) return false;
+
+    let dangerScore = 0;
+    voters.forEach(v => {
+        if (v === player) return;
+        const rel = relationships[v]?.[player] ?? 50;
+        if (rel < 40) dangerScore += 1;
+        if (rel < 25) dangerScore += 1;
+    });
+
+    if (dangerScore >= Math.floor(voters.length / 3)) {
+        return true;
+    }
+
+    const chaosChance = 0.05 + (stats[player].temperament * 0.01);
+    if (Math.random() < chaosChance) {
+        return true;
+    }
+
+    return false;
+}
+
+function handleIdolPlay(voters, immune) {
+    let html = "";
+    let playedBy = null;
+
+    voters.forEach(player => {
+        if (playedBy) return;
+        if (!idolsHeld[player]) return;
+
+        if (shouldPlayIdol(player, voters, immune)) {
+            playedBy = player;
+            delete idolsHeld[player];
+
+            html += `
+                <div class="idolFoundBox" style="background: rgba(255,150,80,0.2); color:#b33;">
+                    🛡️ <strong>${player} plays a Hidden Immunity Idol!</strong>
+                </div>
+            `;
+        }
+    });
+
+    return { playedBy, html };
+}
+
+function nullifyVotes(votes, idolPlayer) {
+    if (!idolPlayer) return { newVotes: votes, nullifiedCount: 0 };
+
+    let newVotes = {};
+    let nullified = 0;
+
+    for (const [voter, target] of Object.entries(votes)) {
+        if (target === idolPlayer) {
+            nullified++;
+            newVotes[voter] = null;
+        } else {
+            newVotes[voter] = target;
+        }
+    }
+
+    return { newVotes, nullifiedCount: nullified };
+}
+
+/* ============================================================
+   MERGE IDOL + RESET + EXPIRATION
+   ============================================================ */
+
+function checkAndPlaceMergeIdol() {
+    if (idolMode !== "tribes") return;
+    if (!merged) return;
+    if (idolPool.Merged) return;
+    idolPool.Merged = true;
+}
+
+function resetIdolsForNewSeason() {
+    idolsPlaced = false;
+    idolPool = { A: false, B: false, Merged: false, global: false };
+    idolsHeld = {};
+}
+
+function disableExpiredIdols() {
+    const remaining = [...tribes.A, ...tribes.B, ...tribes.Merged].length;
+    if (remaining <= idolExpireAt) {
+        idolsHeld = {};
+        idolPool = { A: false, B: false, Merged: false, global: false };
+    }
+}
+
+/* ============================================================
+   RELATIONSHIPS + STATS INIT
+   ============================================================ */
+
+function initRelationships() {
+    relationships = {};
+    cast.forEach(a => {
+        relationships[a] = {};
+        cast.forEach(b => {
+            if (a === b) return;
+            relationships[a][b] = 40 + Math.floor(Math.random() * 21);
         });
     });
 }
 
-function initStats(players) {
-    players.forEach(p => {
-        stats[p] = {
-            tribeHistory: [],
-            immunityWins: 0,
-            votesReceived: 0,
-            votesCast: [],
-            placement: null,
-            eliminatedEpisode: null,
-
+function initStats() {
+    stats = {};
+    cast.forEach(name => {
+        stats[name] = {
             physical: 3,
-            endurance: 3,
             mental: 3,
             social: 3,
-            temperament: 3,
-            luck: 3,
             strategy: 3,
             loyalty: 3,
-
-            votedForWinner: null
+            temperament: 3,
+            luck: 3,
+            placement: null,
+            eliminatedEpisode: null,
+            votesReceived: 0,
+            votesCast: []
         };
     });
-}
-
-function recordTribeHistory() {
-    [...tribes.A, ...tribes.B, ...tribes.Merged].forEach(p => {
-        if (tribes.A.includes(p)) stats[p].tribeHistory.push("A");
-        else if (tribes.B.includes(p)) stats[p].tribeHistory.push("B");
-        else stats[p].tribeHistory.push("Merged");
-    });
-}
-
-function adjustRelationship(a, b, amount) {
-    relationships[a][b] = Math.max(0, Math.min(100, relationships[a][b] + amount));
-    relationships[b][a] = Math.max(0, Math.min(100, relationships[b][a] + amount));
 }
 
 /* ============================================================
@@ -105,332 +282,15 @@ function adjustRelationship(a, b, amount) {
    ============================================================ */
 
 function assignTribes() {
-    const shuffled = shuffle([...cast]);
+    tribes = { A: [], B: [], Merged: [] };
+    merged = false;
+    jury = [];
+    episode = 1;
+
+    let shuffled = shuffle([...cast]);
     const half = Math.ceil(shuffled.length / 2);
     tribes.A = shuffled.slice(0, half);
     tribes.B = shuffled.slice(half);
-}
-
-/* ============================================================
-   EVENTS (from events.js)
-   ============================================================ */
-
-function runEvent(tribe) {
-    const size = tribe.length;
-
-    const possible = EVENTS.filter(e =>
-        (typeof e.players === "number" && e.players <= size) ||
-        e.players === "tribe"
-    );
-
-    if (possible.length === 0) return "";
-
-    const event = possible[Math.floor(Math.random() * possible.length)];
-
-    let chosenPlayers;
-
-    if (event.players === "tribe") {
-        chosenPlayers = [...tribe];
-    } else {
-        chosenPlayers = shuffle([...tribe]).slice(0, event.players);
-    }
-
-    event.change.forEach(([a, b, amount]) => {
-        adjustRelationship(chosenPlayers[a], chosenPlayers[b], amount);
-    });
-
-    return showImages(chosenPlayers) + event.text(chosenPlayers);
-}
-
-/* ============================================================
-   CHALLENGES (from challenges.js)
-   ============================================================ */
-
-function getRandomChallenge(type) {
-    const pool = CHALLENGES.filter(c => c.type === type);
-    if (pool.length === 0) return null;
-    return pool[Math.floor(Math.random() * pool.length)];
-}
-
-function computePlayerScore(player, weights) {
-    let score = 0;
-    for (const key in weights) {
-        if (stats[player][key] !== undefined) {
-            score += stats[player][key] * weights[key];
-        }
-    }
-    score += stats[player].luck * 0.2;
-    return score;
-}
-
-function computeTribeScore(tribePlayers, weights) {
-    if (!tribePlayers || tribePlayers.length === 0) return 0;
-    let total = 0;
-    tribePlayers.forEach(p => {
-        total += computePlayerScore(p, weights);
-    });
-    return total / tribePlayers.length;
-}
-
-/* ============================================================
-   TIEBREAKERS (from tiebreakers.js)
-   ============================================================ */
-
-function getRandomTiebreaker() {
-    if (!TIEBREAKERS || TIEBREAKERS.length === 0) return null;
-    return TIEBREAKERS[Math.floor(Math.random() * TIEBREAKERS.length)];
-}
-
-/* ============================================================
-   TRACK RECORD
-   ============================================================ */
-
-function showTrackRecord() {
-    let html = `<h2>Season Track Record</h2>`;
-
-    const totalEpisodes = episodeResults.length;
-
-    html += `<table border="1" cellpadding="6" style="margin:auto; border-collapse:collapse;">`;
-
-    html += `<tr>
-                <th rowspan="2">Rank</th>
-                <th rowspan="2">Contestant</th>
-                <th rowspan="2">Photo</th>`;
-
-    for (let i = 1; i <= totalEpisodes; i++) {
-        html += `<th>Ep. ${i}</th>`;
-    }
-
-    html += `<th>Ep. ${episode}</th>`;
-    html += `</tr>`;
-
-    html += `<tr>`;
-
-    let i = 0;
-    while (i < episodeResults.length) {
-        let phase = episodeResults[i].phase;
-        let span = 1;
-
-        while (
-            i + span < episodeResults.length &&
-            episodeResults[i + span].phase === phase
-        ) {
-            span++;
-        }
-
-        html += `<td colspan="${span}" style="background:#ddd; font-weight:bold;">${phase}</td>`;
-        i += span;
-    }
-
-    html += `<td style="background:#ddd; font-weight:bold;">Final</td>`;
-    html += `</tr>`;
-
-    const sortedPlayers = Object.keys(stats).sort((a, b) => stats[a].placement - stats[b].placement);
-
-    let runnerUps = [];
-    if (finaleFinalists.length > 0 && finaleWinner) {
-        runnerUps = finaleFinalists.filter(p => p !== finaleWinner);
-    }
-    let printedSecondPlace = false;
-
-    sortedPlayers.forEach(player => {
-        const placement = stats[player].placement;
-        const isRunnerUp = runnerUps.includes(player) && runnerUps.length === 2;
-
-        html += `<tr>`;
-
-        if (placement === 2 && isRunnerUp) {
-            if (!printedSecondPlace) {
-                html += `<td rowspan="2">2</td>`;
-                printedSecondPlace = true;
-            }
-        } else {
-            html += `<td>${placement}</td>`;
-        }
-
-        html += `<td>${player}</td>`;
-        html += `<td>${showImage(player)}</td>`;
-
-        const eliminatedEp = stats[player].eliminatedEpisode;
-
-        episodeResults.forEach((ep, index) => {
-            const epNum = index + 1;
-
-            if (eliminatedEp && epNum > eliminatedEp) {
-                html += `<td style="background:#dddddd;"></td>`;
-                return;
-            }
-
-            let result = ep.results[player] || "";
-
-            let bg = "white";
-            let color = "black";
-
-            if (result === "OUT") bg = "#ff9999";
-            if (result === "IMM") bg = ep.phase === "Pre-Merge" ? "#55cc55" : "#99ff99";
-            if (result === "SAFE") bg = "white";
-            if (result === "TIE") bg = "#ffbb66";
-            if (result === "TIEBRK") {
-                bg = "#cc5500";
-                color = "white";
-                result = "TIE";
-            }
-
-            html += `<td style="background:${bg}; color:${color};">${result}</td>`;
-        });
-
-        if (jury.includes(player)) {
-            const votedFor = stats[player].votedForWinner || "—";
-            html += `<td style="background:#e6e6e6; color:black; text-align:center;">
-                        <strong>JUROR</strong><br>
-                        <small><em>(${votedFor})</em></small>
-                     </td>`;
-        } else if (finaleFinalists.includes(player)) {
-            if (player === finaleWinner) {
-                html += `<td style="background:#ffd700; font-weight:bold; text-align:center;">WINNER</td>`;
-            } else {
-                html += `<td style="background:#c0c0c0; font-weight:bold; text-align:center;">RUNNER-UP</td>`;
-            }
-        } else {
-            html += `<td style="background:#dddddd;"></td>`;
-        }
-
-        html += `</tr>`;
-    });
-
-    html += `</table>`;
-
-    document.getElementById("log").innerHTML += html;
-}
-
-/* ============================================================
-   JURY VOTING
-   ============================================================ */
-
-function juryVote(juror, finalists) {
-    let best = finalists[0];
-    let bestScore = -Infinity;
-
-    finalists.forEach(f => {
-        const rel = relationships[juror]?.[f] ?? 50;
-        if (rel > bestScore) {
-            bestScore = rel;
-            best = f;
-        }
-    });
-
-    return best;
-}
-
-/* ============================================================
-   FINALE
-   ============================================================ */
-
-function runFinale(finalists) {
-    finaleFinalists = [...finalists];
-
-    let html = `<h3>Final Tribal Council (${finalists.length} finalists)</h3>`;
-
-    html += showImages(finalists);
-    html += `<p>The finalists face the jury.</p>`;
-
-    if (jury.length === 0) {
-        html += `<p>No jury exists. A random winner is chosen.</p>`;
-        const winner = finalists[Math.floor(Math.random() * finalists.length)];
-        finaleWinner = winner;
-
-        stats[winner].placement = 1;
-        finalists.forEach(p => {
-            if (p !== winner) stats[p].placement = 2;
-        });
-
-        html += showImages([winner]) + `<h2>${winner} wins Survivor</h2>`;
-        setLog(html);
-        showTrackRecord();
-        document.getElementById("nextEpisodeBtn").disabled = true;
-        return;
-    }
-
-    html += `<h4>Jury Votes</h4>`;
-
-    let voteTally = {};
-    finalists.forEach(f => voteTally[f] = 0);
-
-    jury.forEach(juror => {
-        const voteFor = juryVote(juror, finalists);
-        voteTally[voteFor]++;
-        stats[juror].votedForWinner = voteFor;
-
-        html += showImages([juror, voteFor]) +
-            `<p>${juror} votes for ${voteFor}.</p>`;
-    });
-
-    let maxVotes = Math.max(...Object.values(voteTally));
-    let winners = Object.keys(voteTally).filter(p => voteTally[p] === maxVotes);
-
-    let winner;
-    if (winners.length === 1) {
-        winner = winners[0];
-    } else {
-        winner = winners[Math.floor(Math.random() * winners.length)];
-        html += `<p>The jury is tied. By random draw, ${winner} wins.</p>`;
-    }
-
-    finaleWinner = winner;
-
-    stats[winner].placement = 1;
-    finalists.forEach(p => {
-        if (p !== winner) stats[p].placement = 2;
-    });
-
-    html += `<h4>Final Vote Tally</h4><ul>`;
-    finalists.forEach(f => {
-        html += `<li>${f}: ${voteTally[f]} vote(s)</li>`;
-    });
-    html += `</ul>`;
-
-    html += showImages([winner]) + `<h2>${winner} wins Survivor</h2>`;
-
-    setLog(html);
-    showTrackRecord();
-    document.getElementById("nextEpisodeBtn").disabled = true;
-}
-
-/* ============================================================
-   TIEBREAKERS
-   ============================================================ */
-
-function runRandomCompetitionTiebreaker(tiedPlayers) {
-    const tb = getRandomTiebreaker();
-    let html = "";
-
-    if (!tb) {
-        const loser = tiedPlayers[Math.floor(Math.random() * tiedPlayers.length)];
-        html += showImages(tiedPlayers);
-        html += `<p><strong>Tiebreaker:</strong> Random draw.</p>`;
-        html += `<p>${loser} loses the tiebreaker.</p>`;
-        return { eliminated: loser, log: html };
-    }
-
-    html += showImages(tiedPlayers);
-    html += `<p><strong>Tiebreaker:</strong> ${tb.name}</p>`;
-    html += `<p>${tb.description}</p>`;
-
-    let scores = tiedPlayers.map(p => ({
-        player: p,
-        score: computePlayerScore(p, tb.weights)
-    }));
-
-    scores.sort((a, b) => a.score - b.score);
-
-    const lowestScore = scores[0].score;
-    const lowestPlayers = scores.filter(s => s.score === lowestScore).map(s => s.player);
-
-    const loser = lowestPlayers[Math.floor(Math.random() * lowestPlayers.length)];
-
-    html += `<p>${loser} performs the worst and is eliminated.</p>`;
-
-    return { eliminated: loser, log: html };
 }
 
 /* ============================================================
@@ -450,6 +310,9 @@ function checkMerge() {
         tribes.Merged = remaining;
         tribes.A = [];
         tribes.B = [];
+
+        checkAndPlaceMergeIdol();
+
         return true;
     }
 
@@ -457,85 +320,59 @@ function checkMerge() {
 }
 
 /* ============================================================
-   MAIN EPISODE LOOP
+   EPISODE RUNNER
    ============================================================ */
 
 function runEpisode() {
+    const log = document.getElementById("log");
     let html = `<h3>Episode ${episode}</h3>`;
 
-    recordTribeHistory();
+    disableExpiredIdols();
 
-    const remaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
+    let currentRemaining = merged ? tribes.Merged : [...tribes.A, ...tribes.B];
 
-    if (!finaleSize) {
-        if (finaleSetting === "f2") finaleSize = 2;
-        else if (finaleSetting === "f3") finaleSize = 3;
-        else finaleSize = Math.random() < 0.5 ? 2 : 3;
-    }
-
-    if (remaining.length === finaleSize) {
-        runFinale(remaining);
+    if (currentRemaining.length <= 2) {
+        html += `<p>Finale reached.</p>`;
+        log.innerHTML += html;
         return;
     }
 
-    if (checkMerge()) {
-        html += `<h2>Merge!</h2>`;
-        html += `<p>The tribes merge into one group.</p>`;
+    if (!merged) {
+        html += `<h4>Tribes</h4>`;
+        html += `<p><strong>Tribe A:</strong> ${tribes.A.join(", ")}</p>`;
+        html += `<p><strong>Tribe B:</strong> ${tribes.B.join(", ")}</p>`;
+    } else {
+        html += `<h4>Merged Tribe</h4>`;
+        html += `<p>${tribes.Merged.join(", ")}</p>`;
     }
 
-    const currentRemaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
-
-    let immune = null;
+    // Challenge
+    html += `<h4>Immunity Challenge</h4>`;
     let losingTribe = null;
-    let challenge = getRandomChallenge(merged ? "merge" : "tribe");
+    let immune = null;
 
     if (!merged) {
-        const tribeAScore = challenge ? computeTribeScore(tribes.A, challenge.weights) : Math.random();
-        const tribeBScore = challenge ? computeTribeScore(tribes.B, challenge.weights) : Math.random();
-
-        const winning = tribeAScore > tribeBScore ? "A" : "B";
-        losingTribe = winning === "A" ? "B" : "A";
-        const winningMembers = winning === "A" ? tribes.A : tribes.B;
-
-        if (challenge) {
-            html += `<p><strong>Immunity Challenge:</strong> ${challenge.name}</p>`;
-            html += `<p>${challenge.description}</p>`;
-        }
-
-        html += showImages(winningMembers) +
-            `<p>Tribe ${winning} wins immunity.</p>`;
+        const result = runTribalChallenge(tribes.A, tribes.B, stats); // from challenges.js
+        losingTribe = result.loser;
+        html += result.log;
     } else {
-        if (!challenge) {
-            immune = currentRemaining[Math.floor(Math.random() * currentRemaining.length)];
-        } else {
-            let scores = currentRemaining.map(p => ({
-                player: p,
-                score: computePlayerScore(p, challenge.weights)
-            }));
-            scores.sort((a, b) => b.score - a.score);
-
-            const topScore = scores[0].score;
-            const topPlayers = scores.filter(s => s.score === topScore).map(s => s.player);
-            immune = topPlayers[Math.floor(Math.random() * topPlayers.length)];
-
-            html += `<p><strong>Immunity Challenge:</strong> ${challenge.name}</p>`;
-            html += `<p>${challenge.description}</p>`;
-        }
-
-        stats[immune].immunityWins++;
-        html += showImages([immune]) +
-            `<p><strong>Individual Immunity:</strong> ${immune} wins immunity.</p>`;
+        const result = runIndividualChallenge(currentRemaining, stats); // from challenges.js
+        immune = result.winner;
+        html += result.log;
     }
 
+    // Events
     html += `<h4>Post-Challenge Events</h4>`;
+
     if (!merged) {
-        html += `<p>${runEvent(tribes.A)}</p>`;
-        html += `<p>${runEvent(tribes.B)}</p>`;
+        html += `<p>${runEventWithIdols(tribes.A, "A")}</p>`;
+        html += `<p>${runEventWithIdols(tribes.B, "B")}</p>`;
     } else {
-        html += `<p>${runEvent(currentRemaining)}</p>`;
-        html += `<p>${runEvent(currentRemaining)}</p>`;
+        html += `<p>${runEventWithIdols(currentRemaining, "Merged")}</p>`;
+        html += `<p>${runEventWithIdols(currentRemaining, "Merged")}</p>`;
     }
 
+    // Tribal Council
     html += `<h4>Tribal Council</h4>`;
 
     let voters = merged ? currentRemaining : tribes[losingTribe];
@@ -550,6 +387,7 @@ function runEpisode() {
 
         if (merged) tribes.Merged = [];
         else tribes[losingTribe] = [];
+
     } else {
         let votes = {};
         voters.forEach(voter => {
@@ -557,7 +395,7 @@ function runEpisode() {
 
             let weightedChoices = choices.map(target => {
                 const rel = relationships[voter]?.[target] ?? 50;
-               
+
                 const weight =
                     (6 - stats[voter].loyalty) * 0.4 +
                     (6 - stats[target].social) * 0.2 +
@@ -570,8 +408,8 @@ function runEpisode() {
             });
 
             weightedChoices.sort((a, b) => b.weight - a.weight);
-
             let voteFor = weightedChoices[0].player;
+
             votes[voter] = voteFor;
             stats[voter].votesCast.push(voteFor);
         });
@@ -582,87 +420,63 @@ function runEpisode() {
                 `<p>${voter} voted for ${target}</p>`;
         }
 
+        const idolResult = handleIdolPlay(voters, immune);
+        html += idolResult.html;
+
+        const { newVotes, nullifiedCount } = nullifyVotes(votes, idolResult.playedBy);
+
+        if (idolResult.playedBy) {
+            html += `<p><strong>${nullifiedCount} vote(s) against ${idolResult.playedBy} do not count.</strong></p>`;
+        }
+
         let tally = {};
-        Object.values(votes).forEach(target => {
-            tally[target] = (tally[target] || 0) + 1;
-        });
+        voters.forEach(p => tally[p] = 0);
 
-        let maxVotes = Math.max(...Object.values(tally));
-        let tied = Object.keys(tally).filter(p => tally[p] === maxVotes);
-
-        let tiedPlayersFirstVote = [...tied];
-        let tiedPlayersDeadlock = [];
-
-        if (tied.length === 1) {
-            eliminated = tied[0];
-            html += showImages([eliminated]) +
-                `<p><strong>${eliminated} is voted out.</strong></p>`;
-        } else {
-            html += `<p><strong>The vote is tied between ${tied.join(", ")}. They will revote.</strong></p>`;
-
-            let revoteVotes = {};
-            voters.forEach(voter => {
-                let choices = tied.filter(p => p !== voter && p !== immune);
-                if (choices.length === 0) {
-                    choices = tied.filter(p => p !== immune);
-                }
-
-                let weightedChoices = choices.map(target => {
-                    const rel = relationships[voter]?.[target] ?? 50;
-
-                    const weight =
-                        (6 - stats[voter].loyalty) * 0.4 +
-                        (6 - stats[target].social) * 0.2 +
-                        stats[target].strategy * 0.2 +
-                        (100 - rel) * 0.1 +
-                        Math.random() * stats[voter].temperament * 0.1 +
-                        Math.random() * stats[voter].luck * 0.1;
-
-                    return { player: target, weight };
-                });
-
-                weightedChoices.sort((a, b) => b.weight - a.weight);
-                let voteFor = weightedChoices[0].player;
-
-                revoteVotes[voter] = voteFor;
-            });
-
-            html += `<p><strong>Revote:</strong></p>`;
-            for (const [voter, target] of Object.entries(revoteVotes)) {
-                html += showImages([voter, target]) +
-                    `<p>${voter} voted for ${target}</p>`;
-            }
-
-            let revoteTally = {};
-            Object.values(revoteVotes).forEach(target => {
-                revoteTally[target] = (revoteTally[target] || 0) + 1;
-            });
-
-            let revoteMax = Math.max(...Object.values(revoteTally));
-            let revoteTied = Object.keys(revoteTally).filter(p => revoteTally[p] === revoteMax);
-
-            tiedPlayersDeadlock = [...revoteTied];
-
-            if (revoteTied.length === 1) {
-                eliminated = revoteTied[0];
-                html += showImages([eliminated]) +
-                    `<p><strong>${eliminated} is voted out after the revote.</strong></p>`;
-            } else {
-                html += `<p><strong>The revote is still tied. A tiebreaker competition will decide who goes home.</strong></p>`;
-                const tb = runRandomCompetitionTiebreaker(revoteTied);
-                eliminated = tb.eliminated;
-                html += tb.log;
+        for (const target of Object.values(newVotes)) {
+            if (target && tally[target] !== undefined) {
+                tally[target]++;
             }
         }
 
-        stats[eliminated].votesReceived += (tally[eliminated] || 0);
+        let sorted = Object.entries(tally)
+            .sort((a, b) => b[1] - a[1]);
+
+        let highestVotes = sorted[0][1];
+        let highestPlayers = sorted.filter(e => e[1] === highestVotes).map(e => e[0]);
+
+        let secondHighestVotes = sorted.find(e => e[1] < highestVotes)?.[1] ?? 0;
+        let secondHighestPlayers = sorted.filter(e => e[1] === secondHighestVotes).map(e => e[0]);
+
+        if (idolResult.playedBy && highestPlayers.includes(idolResult.playedBy)) {
+            if (secondHighestPlayers.length === 1) {
+                eliminated = secondHighestPlayers[0];
+                html += showImages([eliminated]) +
+                    `<p><strong>${eliminated} is eliminated with the second-highest votes.</strong></p>`;
+            } else {
+                html += `<p><strong>There is a tie for second-highest votes.</strong></p>`;
+                const tb = runRandomCompetitionTiebreaker(secondHighestPlayers); // from tiebreakers.js
+                eliminated = tb.eliminated;
+                html += tb.log;
+            }
+
+        } else if (highestPlayers.length === 1) {
+            eliminated = highestPlayers[0];
+            html += showImages([eliminated]) +
+                `<p><strong>${eliminated} is voted out.</strong></p>`;
+
+        } else {
+            html += `<p><strong>The vote is tied between ${highestPlayers.join(", ")}.</strong></p>`;
+            const tb = runRandomCompetitionTiebreaker(highestPlayers);
+            eliminated = tb.eliminated;
+            html += tb.log;
+        }
+
+        stats[eliminated].votesReceived += tally[eliminated];
         stats[eliminated].placement = currentRemaining.length;
         stats[eliminated].eliminatedEpisode = episode;
 
         const wasMerged = merged || tribes.Merged.includes(eliminated);
-        if (wasMerged) {
-            jury.push(eliminated);
-        }
+        if (wasMerged) jury.push(eliminated);
 
         if (merged) {
             tribes.Merged = voters.filter(p => p !== eliminated);
@@ -677,101 +491,117 @@ function runEpisode() {
                 epData.results[p] = "OUT";
             } else if (p === immune) {
                 epData.results[p] = "IMM";
-            } else if (!merged && tribes[losingTribe] && !tribes[losingTribe].includes(p)) {
-                epData.results[p] = "IMM";
             } else {
                 epData.results[p] = "SAFE";
             }
         });
 
-        tiedPlayersFirstVote.forEach(p => {
-            if (p !== eliminated) epData.results[p] = "TIE";
-        });
-
-        tiedPlayersDeadlock.forEach(p => {
-            if (p !== eliminated) epData.results[p] = "TIEBRK";
-        });
+        if (idolResult.playedBy) {
+            epData.results[idolResult.playedBy] = "IMM";
+        }
 
         episodeResults.push(epData);
     }
 
-    setLog(html);
+    checkMerge();
+
     episode++;
+    log.innerHTML += html;
 }
 
 /* ============================================================
-   MAIN MENU: CAST + STAT EDITOR + SETTINGS
+   UI: CAST SETUP
    ============================================================ */
 
-function renderCastList() {
-    const container = document.getElementById("castList");
-    container.innerHTML = "";
+const addContestantBtn = document.getElementById("addContestantBtn");
+const castListDiv = document.getElementById("castList");
+const startBtn = document.getElementById("startBtn");
+const editStatsBtn = document.getElementById("editStatsBtn");
+const settingsBtn = document.getElementById("settingsBtn");
+const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+const saveStatsBtn = document.getElementById("saveStatsBtn");
+const nextEpisodeBtn = document.getElementById("nextEpisodeBtn");
 
-    cast.forEach(name => {
-        const card = document.createElement("div");
-        card.className = "castCard";
+const mainMenuDiv = document.getElementById("mainMenu");
+const statEditorDiv = document.getElementById("statEditor");
+const settingsMenuDiv = document.getElementById("settingsMenu");
+const gameDiv = document.getElementById("game");
 
-        const img = document.createElement("img");
-        img.src = photos[name] || "https://via.placeholder.com/80?text=No+Image";
-        img.alt = name;
-
-        const label = document.createElement("div");
-        label.textContent = name;
-
-        const removeBtn = document.createElement("button");
-        removeBtn.textContent = "Remove";
-        removeBtn.onclick = () => {
-            cast = cast.filter(n => n !== name);
-            delete photos[name];
-            delete stats[name];
-            delete relationships[name];
-            renderCastList();
-        };
-
-        card.appendChild(img);
-        card.appendChild(label);
-        card.appendChild(removeBtn);
-        container.appendChild(card);
-    });
-}
-
-function addContestant() {
+addContestantBtn.onclick = () => {
     const nameInput = document.getElementById("newName");
     const photoInput = document.getElementById("newPhoto");
-
     const name = nameInput.value.trim();
-    const url = photoInput.value.trim();
+    const photo = photoInput.value.trim();
 
     if (!name) return;
 
-    if (!cast.includes(name)) {
-        cast.push(name);
-        photos[name] = url || null;
-    } else {
-        photos[name] = url || photos[name] || null;
-    }
+    cast.push(name);
+    if (photo) photos[name] = photo;
 
     nameInput.value = "";
     photoInput.value = "";
 
     renderCastList();
+};
+
+function renderCastList() {
+    castListDiv.innerHTML = "";
+    cast.forEach(name => {
+        const card = document.createElement("div");
+        card.className = "castCard";
+
+        const imgSrc = photos[name] || "";
+        if (imgSrc) {
+            card.innerHTML = `
+                <img src="${imgSrc}" class="contestant-photo" alt="${name}">
+                <p>${name}</p>
+                <button data-name="${name}">Remove</button>
+            `;
+        } else {
+            card.innerHTML = `
+                <div class="contestant-photo" style="background:#ddd;display:flex;align-items:center;justify-content:center;">${name}</div>
+                <p>${name}</p>
+                <button data-name="${name}">Remove</button>
+            `;
+        }
+
+        const btn = card.querySelector("button");
+        btn.onclick = () => {
+            cast = cast.filter(c => c !== name);
+            delete photos[name];
+            renderCastList();
+        };
+
+        castListDiv.appendChild(card);
+    });
 }
 
-function openStatEditor() {
+/* ============================================================
+   UI: SETTINGS
+   ============================================================ */
+
+settingsBtn.onclick = () => {
+    mainMenuDiv.style.display = "none";
+    settingsMenuDiv.style.display = "block";
+};
+
+saveSettingsBtn.onclick = () => {
+    applySettings();
+    settingsMenuDiv.style.display = "none";
+    mainMenuDiv.style.display = "block";
+};
+
+/* ============================================================
+   UI: STATS EDITOR
+   ============================================================ */
+
+editStatsBtn.onclick = () => {
     if (cast.length === 0) return;
 
-    initRelationships(cast);
-    initStats(cast);
+    if (Object.keys(stats).length === 0) {
+        initStats();
+    }
 
-    document.getElementById("mainMenu").style.display = "none";
-    document.getElementById("settingsMenu").style.display = "none";
-    document.getElementById("game").style.display = "none";
-    document.getElementById("statEditor").style.display = "block";
-
-    renderStatEditor();
-}
-
-function renderStatEditor() {
     const container = document.getElementById("statEditorContent");
     container.innerHTML = "";
 
@@ -779,152 +609,167 @@ function renderStatEditor() {
         const block = document.createElement("div");
         block.className = "statBlock";
 
-        const header = document.createElement("div");
-        header.className = "statHeader";
-
-        const img = document.createElement("img");
-        img.src = photos[name] || "https://via.placeholder.com/80?text=No+Image";
-        img.alt = name;
-
-        const title = document.createElement("div");
-        title.textContent = name;
-
-        header.appendChild(img);
-        header.appendChild(title);
-        block.appendChild(header);
-
-        const row1 = document.createElement("div");
-        row1.className = "statRow";
-        row1.appendChild(makeStatField(name, "physical", "Physical"));
-        row1.appendChild(makeStatField(name, "endurance", "Endurance"));
-        row1.appendChild(makeStatField(name, "mental", "Mental"));
-        row1.appendChild(makeStatField(name, "social", "Social"));
-
-        const row2 = document.createElement("div");
-        row2.className = "statRow";
-        row2.appendChild(makeStatField(name, "temperament", "Temperament"));
-        row2.appendChild(makeStatField(name, "luck", "Luck"));
-        row2.appendChild(makeStatField(name, "strategy", "Strategy"));
-        row2.appendChild(makeStatField(name, "loyalty", "Loyalty"));
-
-        block.appendChild(row1);
-        block.appendChild(row2);
+        const imgSrc = photos[name] || "";
+        block.innerHTML = `
+            <div class="statHeader">
+                ${imgSrc ? `<img src="${imgSrc}" alt="${name}">` : `<div class="contestant-photo" style="background:#ddd;display:flex;align-items:center;justify-content:center;">${name}</div>`}
+                <h3>${name}</h3>
+            </div>
+            <div class="statRow">
+                <label>Physical:</label>
+                <select data-name="${name}" data-stat="physical">${statOptions(stats[name].physical)}</select>
+                <label>Mental:</label>
+                <select data-name="${name}" data-stat="mental">${statOptions(stats[name].mental)}</select>
+                <label>Social:</label>
+                <select data-name="${name}" data-stat="social">${statOptions(stats[name].social)}</select>
+            </div>
+            <div class="statRow">
+                <label>Strategy:</label>
+                <select data-name="${name}" data-stat="strategy">${statOptions(stats[name].strategy)}</select>
+                <label>Loyalty:</label>
+                <select data-name="${name}" data-stat="loyalty">${statOptions(stats[name].loyalty)}</select>
+                <label>Temperament:</label>
+                <select data-name="${name}" data-stat="temperament">${statOptions(stats[name].temperament)}</select>
+            </div>
+            <div class="statRow">
+                <label>Luck:</label>
+                <select data-name="${name}" data-stat="luck">${statOptions(stats[name].luck)}</select>
+            </div>
+        `;
 
         container.appendChild(block);
     });
-}
 
-function makeStatField(name, key, labelText) {
-    const wrapper = document.createElement("div");
+    mainMenuDiv.style.display = "none";
+    statEditorDiv.style.display = "block";
+};
 
-    const label = document.createElement("label");
-    label.textContent = labelText + ":";
-
-    const select = document.createElement("select");
-    select.dataset.player = name;
-    select.dataset.stat = key;
-
+function statOptions(selected) {
+    let html = "";
     for (let i = 1; i <= 5; i++) {
-        const opt = document.createElement("option");
-        opt.value = i;
-        opt.textContent = i;
-        if ((stats[name] && stats[name][key] === i) || (!stats[name] && i === 3)) {
-            opt.selected = true;
-        }
-        select.appendChild(opt);
+        html += `<option value="${i}" ${i === selected ? "selected" : ""}>${i}</option>`;
     }
-
-    wrapper.appendChild(label);
-    wrapper.appendChild(select);
-    return wrapper;
+    return html;
 }
 
-function saveStatsAndReturn() {
-    const selects = document.querySelectorAll("#statEditorContent select");
+saveStatsBtn.onclick = () => {
+    const selects = statEditorDiv.querySelectorAll("select[data-name]");
     selects.forEach(sel => {
-        const player = sel.dataset.player;
-        const key = sel.dataset.stat;
-        const value = parseInt(sel.value, 10);
-
-        if (!stats[player]) stats[player] = {};
-        stats[player][key] = value;
+        const name = sel.getAttribute("data-name");
+        const stat = sel.getAttribute("data-stat");
+        const val = parseInt(sel.value, 10);
+        stats[name][stat] = val;
     });
 
-    document.getElementById("statEditor").style.display = "none";
-    document.getElementById("mainMenu").style.display = "block";
-}
-
-/* ============================================================
-   SETTINGS MENU
-   ============================================================ */
-
-function openSettings() {
-    document.getElementById("mainMenu").style.display = "none";
-    document.getElementById("statEditor").style.display = "none";
-    document.getElementById("game").style.display = "none";
-    document.getElementById("settingsMenu").style.display = "block";
-
-    document.getElementById("finaleSetting").value = finaleSetting;
-}
-
-function saveSettings() {
-    finaleSetting = document.getElementById("finaleSetting").value;
-
-    document.getElementById("settingsMenu").style.display = "none";
-    document.getElementById("mainMenu").style.display = "block";
-}
+    statEditorDiv.style.display = "none";
+    mainMenuDiv.style.display = "block";
+};
 
 /* ============================================================
    START SEASON
    ============================================================ */
 
-document.getElementById("addContestantBtn").onclick = addContestant;
-document.getElementById("editStatsBtn").onclick = openStatEditor;
-document.getElementById("settingsBtn").onclick = openSettings;
-document.getElementById("saveSettingsBtn").onclick = saveSettings;
-document.getElementById("saveStatsBtn").onclick = saveStatsAndReturn;
+startBtn.onclick = () => {
+    if (cast.length < 4) return;
 
-document.getElementById("startBtn").onclick = () => {
-    if (cast.length === 0) return;
+    applySettings();
+    resetIdolsForNewSeason();
 
-    merged = false;
-    tribes = { A: [], B: [], Merged: [] };
-    episode = 1;
+    initRelationships();
+    initStats();
+    assignTribes();
+    placeIdols();
+
+    mainMenuDiv.style.display = "none";
+    gameDiv.style.display = "block";
+
+    document.getElementById("log").innerHTML = "";
     episodeResults = [];
     jury = [];
-    finaleSize = null;
-    finaleFinalists = [];
     finaleWinner = null;
-
-    initRelationships(cast);
-    initStats(cast);
-
-    if (cast.length < 10) {
-        merged = true;
-        tribes.A = [];
-        tribes.B = [];
-        tribes.Merged = [...cast];
-    } else {
-        assignTribes();
-    }
-
-    document.getElementById("mainMenu").style.display = "none";
-    document.getElementById("statEditor").style.display = "none";
-    document.getElementById("settingsMenu").style.display = "none";
-    document.getElementById("game").style.display = "block";
-
-    if (merged) {
-        setLog(`
-            <h3>Season Begins!</h3>
-            <p>The game begins at the <strong>Merge</strong> due to a small cast (${cast.length} players).</p>
-        `);
-    } else {
-        setLog(`
-            <h3>Season Begins!</h3>
-            <p><strong>Tribe A:</strong> ${tribes.A.join(", ")}</p>
-            <p><strong>Tribe B:</strong> ${tribes.B.join(", ")}</p>
-        `);
-    }
 };
 
-document.getElementById("nextEpisodeBtn").onclick = runEpisode;
+nextEpisodeBtn.onclick = () => {
+    runEpisode();
+};
+
+/* ============================================================
+   TRACK RECORD + FINALE
+   ============================================================ */
+
+function buildTrackRecordTable() {
+    let html = `<h3>Track Record</h3>`;
+    html += `<table border="1" cellpadding="6"><tr><th>Player</th>`;
+
+    episodeResults.forEach((ep, i) => {
+        html += `<th>Ep ${i + 1}</th>`;
+    });
+
+    html += `</tr>`;
+
+    cast.forEach(player => {
+        html += `<tr><td>${player}</td>`;
+        episodeResults.forEach(ep => {
+            let val = ep.results[player] || "";
+            html += `<td>${val}</td>`;
+        });
+        html += `</tr>`;
+    });
+
+    html += `</table>`;
+    return html;
+}
+
+function runFinale() {
+    const log = document.getElementById("log");
+    let html = `<h3>Finale</h3>`;
+
+    let finalists = tribes.Merged;
+
+    html += `<p><strong>Finalists:</strong> ${finalists.join(", ")}</p>`;
+    html += showImages(finalists);
+
+    let votes = {};
+    finalists.forEach(f => votes[f] = 0);
+
+    jury.forEach(juror => {
+        let weighted = finalists.map(f => {
+            const rel = relationships[juror]?.[f] ?? 50;
+            const weight = rel + stats[f].social * 5 + stats[f].strategy * 3;
+            return { f, weight };
+        });
+
+        weighted.sort((a, b) => b.weight - a.weight);
+        votes[weighted[0].f]++;
+    });
+
+    html += `<h4>Final Jury Votes</h4>`;
+    finalists.forEach(f => {
+        html += `<p>${f}: ${votes[f]} vote(s)</p>`;
+    });
+
+    finalists.sort((a, b) => votes[b] - votes[a]);
+    finaleWinner = finalists[0];
+
+    html += `<h2>🏆 ${finaleWinner} wins Survivor!</h2>`;
+    html += showImages([finaleWinner]);
+
+    html += buildTrackRecordTable();
+
+    log.innerHTML += html;
+}
+
+/* ============================================================
+   ENDGAME CHECK
+   ============================================================ */
+
+function checkForFinale() {
+    const remaining = tribes.Merged.length;
+
+    if (remaining <= 3) {
+        runFinale();
+        return true;
+    }
+
+    return false;
+}
