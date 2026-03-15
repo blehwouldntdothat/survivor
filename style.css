@@ -1,14 +1,67 @@
+/* ============================
+   GLOBAL PAGE STYLING
+   ============================ */
+
 body {
     font-family: Arial, sans-serif;
-    text-align: center;
-    background: #fafafa;
-    margin: 0;
+    background: #f3f3f3;
     padding: 20px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
 }
 
 h1 {
     margin-bottom: 10px;
 }
+
+/* ============================
+   CONTESTANT PHOTOS
+   ============================ */
+
+img.contestant-photo {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+/* Track record icons have NO outline */
+table img.contestant-photo {
+    outline: none !important;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* ============================
+   MULTI-PERSON ICON GRID
+   ============================ */
+
+.icon-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+
+    width: 100%;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 6px;
+}
+
+/* Outline ONLY in episode log + events */
+#log img.contestant-photo,
+.icon-grid img.contestant-photo {
+    outline: 2px solid rgba(0,0,0,0.15);
+    outline-offset: 2px;
+}
+
+/* ============================
+   MAIN MENU
+   ============================ */
 
 #addContestantForm input {
     padding: 6px;
@@ -120,18 +173,4 @@ h1 {
     max-width: 900px;
     margin: auto;
     text-align: left;
-}
-
-.icon-grid {
-    display: flex;
-    justify-content: center;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.contestant-photo {
-    width: 60px;
-    height: 60px;
-    object-fit: cover;
-    border-radius: 4px;
 }
