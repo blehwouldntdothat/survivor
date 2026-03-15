@@ -24,6 +24,13 @@ let finaleWinner = null;
 // SETTINGS
 let finaleSetting = "random";
 
+function assignTribes() {
+    const shuffled = shuffle([...cast]);
+    const half = Math.ceil(shuffled.length / 2);
+    tribes.A = shuffled.slice(0, half);
+    tribes.B = shuffled.slice(half);
+}
+
 /* ============================================================
    RELATIONSHIPS + STATS
    ============================================================ */
