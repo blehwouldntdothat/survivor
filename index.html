@@ -27,9 +27,28 @@
 
     <div id="menuButtons">
         <button id="editStatsBtn">Edit All Stats</button>
+        <button id="settingsBtn">Settings</button>
         <button id="startBtn">Start Season</button>
     </div>
 
+</div>
+
+<!-- ============================
+     SETTINGS MENU
+     ============================ -->
+<div id="settingsMenu" style="display:none;">
+    <h2>Settings</h2>
+
+    <div class="settingsBlock">
+        <label for="finaleSetting">Finale Type:</label>
+        <select id="finaleSetting">
+            <option value="random">Random (Default)</option>
+            <option value="f2">Final 2</option>
+            <option value="f3">Final 3</option>
+        </select>
+    </div>
+
+    <button id="saveSettingsBtn">Save Settings & Return</button>
 </div>
 
 <!-- ============================
