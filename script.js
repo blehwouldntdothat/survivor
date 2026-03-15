@@ -269,6 +269,17 @@ function computePlayerScore(player, weights) {
     return score;
 }
 
+function computeTribeScore(tribe, weights) {
+    let total = 0;
+
+    tribe.forEach(player => {
+        total += computePlayerScore(player, weights);
+    });
+
+    return total / tribe.length;
+}
+
+
 function getRandomTiebreaker() {
     if (!TIEBREAKERS || TIEBREAKERS.length === 0) return null;
     return TIEBREAKERS[Math.floor(Math.random() * TIEBREAKERS.length)];
