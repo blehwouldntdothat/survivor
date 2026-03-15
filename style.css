@@ -60,6 +60,30 @@ table img.contestant-photo {
 }
 
 /* ============================
+   GLOBAL TEXT ALIGNMENT FIXES
+   ============================ */
+
+#mainMenu,
+#statEditor,
+#game,
+#log {
+    text-align: center;
+}
+
+/* Center all table text (track record) */
+table {
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+}
+
+table th,
+table td {
+    text-align: center !important;
+    vertical-align: middle;
+}
+
+/* ============================
    MAIN MENU
    ============================ */
 
@@ -87,6 +111,7 @@ table img.contestant-photo {
     padding: 8px;
     width: 150px;
     border-radius: 6px;
+    text-align: center;
 }
 
 .castCard img {
@@ -126,11 +151,13 @@ table img.contestant-photo {
     padding: 12px;
     margin: 15px 0;
     border-radius: 6px;
+    text-align: center;
 }
 
 .statHeader {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 12px;
     margin-bottom: 10px;
 }
@@ -144,14 +171,14 @@ table img.contestant-photo {
 
 .statRow {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
+    gap: 20px;
     margin: 6px 0;
 }
 
 .statRow label {
-    width: 120px;
     text-align: right;
-    padding-right: 10px;
+    padding-right: 6px;
 }
 
 .statRow select {
@@ -172,5 +199,5 @@ table img.contestant-photo {
 #log {
     max-width: 900px;
     margin: auto;
-    text-align: left;
+    text-align: center;
 }
