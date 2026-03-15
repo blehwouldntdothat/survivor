@@ -102,7 +102,7 @@ function randomEvent(tribe) {
 }
 
 function checkMerge() {
-    if (merged) return false; // Already merged from start
+    if (merged) return false;
 
     const remaining = [...tribes.A, ...tribes.B];
 
@@ -169,8 +169,16 @@ function showTrackRecord() {
                     <td>${player}</td>
                     <td>${showImage(player)}</td>`;
 
-        episodeResults.forEach(ep => {
+        let eliminatedAt = stats[player].placement;
+
+        episodeResults.forEach((ep, index) => {
             let result = ep.results[player] || "";
+
+            // GREY OUT FUTURE EPISODES AFTER ELIMINATION
+            if (index + 1 > episodeResults.length - eliminatedAt) {
+                html += `<td style="background:#dddddd;"></td>`;
+                return;
+            }
 
             let bg = "white";
             let color = "black";
@@ -180,13 +188,14 @@ function showTrackRecord() {
             if (result === "SAFE") bg = "white";
 
             if (result === "TIE") {
-                bg = "#ff8800";
-                color = "white";
+                bg = "#ffbb66"; // lighter orange
+                color = "black";
             }
 
             if (result === "TIEBRK") {
-                bg = "#cc5500";
+                bg = "#cc5500"; // darker orange
                 color = "white";
+                result = "tie"; // display text
             }
 
             html += `<td style="background:${bg}; color:${color};">${result}</td>`;
@@ -373,7 +382,7 @@ function runEpisode() {
             } else if (p === immune) {
                 epData.results[p] = "IMM";
             } else if (!merged && tribes[losingTribe] && !tribes[losingTribe].includes(p)) {
-                epData.results[p] = "IMM"; // TEAM IMMUNITY RESTORED
+                epData.results[p] = "IMM";
             } else {
                 epData.results[p] = "SAFE";
             }
