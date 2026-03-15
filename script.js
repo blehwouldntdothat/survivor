@@ -201,6 +201,26 @@ function recordTribeHistory() {
     });
 }
 
+function checkMerge() {
+    if (merged) return false;
+
+    const remaining = [...tribes.A, ...tribes.B];
+
+    if (!merged &&
+        remaining.length <= mergeAt &&
+        episode >= minMergeEpisode) {
+
+        merged = true;
+        tribes.Merged = remaining;
+        tribes.A = [];
+        tribes.B = [];
+        return true;
+    }
+
+    return false;
+}
+
+
 /* ============================================================
    IDOL EXPIRATION (NEW)
    ============================================================ */
