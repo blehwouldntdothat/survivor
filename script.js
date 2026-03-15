@@ -2,9 +2,8 @@ let cast = [];
 let tribes = { A: [], B: [] };
 let episode = 1;
 
-function setLog(text) {
-    const logDiv = document.getElementById("log");
-    logDiv.innerHTML = text; // replaces instead of appending
+function setLog(html) {
+    document.getElementById("log").innerHTML = html;
 }
 
 function shuffle(array) {
@@ -18,15 +17,15 @@ function assignTribes() {
     tribes.B = shuffled.slice(half);
 }
 
-function randomEvent(tribeMembers) {
-    if (tribeMembers.length < 2) {
-        return `${tribeMembers[0]} spends the day alone.`;
+function randomEvent(tribe) {
+    if (tribe.length < 2) {
+        return `${tribe[0]} spends the day alone.`;
     }
 
-    const p1 = tribeMembers[Math.floor(Math.random() * tribeMembers.length)];
+    const p1 = tribe[Math.floor(Math.random() * tribe.length)];
     let p2 = p1;
     while (p2 === p1) {
-        p2 = tribeMembers[Math.floor(Math.random() * tribeMembers.length)];
+        p2 = tribe[Math.floor(Math.random() * tribe.length)];
     }
 
     const events = [
@@ -41,68 +40,62 @@ function randomEvent(tribeMembers) {
 }
 
 function runEpisode() {
-    let logText = `<h3>Episode ${episode}</h3>`;
+    let html = `<h3>Episode ${episode}</h3>`;
 
-    // 1. Immunity
-    const winningTribe = Math.random() < 0.5 ? "A" : "B";
-    const losingTribe = winningTribe === "A" ? "B" : "A";
+    // IMMUNITY
+    const winning = Math.random() < 0.5 ? "A" : "B";
+    const losing = winning === "A" ? "B" : "A";
 
-    logText += `<p><strong>Immunity Challenge:</strong> Tribe ${winningTribe} wins immunity!</p>`;
+    html += `<p><strong>Immunity Challenge:</strong> Tribe ${winning} wins immunity!</p>`;
 
-    // 2. Post-challenge events
-    logText += `<h4>Post-Challenge Events</h4>`;
-    logText += `<p>${randomEvent(tribes.A)}</p>`;
-    logText += `<p>${randomEvent(tribes.B)}</p>`;
+    // POST-CHALLENGE EVENTS
+    html += `<h4>Post-Challenge Events</h4>`;
+    html += `<p>${randomEvent(tribes.A)}</p>`;
+    html += `<p>${randomEvent(tribes.B)}</p>`;
 
-    // 3. Tribal Council
-    const tribeMembers = tribes[losingTribe];
+    // TRIBAL COUNCIL
+    html += `<h4>Tribal Council (${losing})</h4>`;
+    const tribe = tribes[losing];
 
-    logText += `<h4>Tribal Council (${losingTribe})</h4>`;
-
-    if (tribeMembers.length === 1) {
-        // Auto-eliminate
-        const eliminated = tribeMembers[0];
-        logText += `<p>${eliminated} is automatically eliminated.</p>`;
-        tribes[losingTribe] = [];
+    if (tribe.length === 1) {
+        const eliminated = tribe[0];
+        html += `<p>${eliminated} is automatically eliminated.</p>`;
+        tribes[losing] = [];
     } else {
-        // Voting
         let votes = {};
-        tribeMembers.forEach(voter => {
+
+        tribe.forEach(voter => {
             let voteFor = voter;
             while (voteFor === voter) {
-                voteFor = tribeMembers[Math.floor(Math.random() * tribeMembers.length)];
+                voteFor = tribe[Math.floor(Math.random() * tribe.length)];
             }
             votes[voter] = voteFor;
         });
 
-        // Display votes
-        logText += `<p><strong>Votes:</strong></p>`;
-        Object.entries(votes).forEach(([voter, target]) => {
-            logText += `<p>${voter} voted for ${target}</p>`;
-        });
+        html += `<p><strong>Votes:</strong></p>`;
+        for (const [voter, target] of Object.entries(votes)) {
+            html += `<p>${voter} voted for ${target}</p>`;
+        }
 
-        // Count votes
         let tally = {};
         Object.values(votes).forEach(target => {
             tally[target] = (tally[target] || 0) + 1;
         });
 
-        // Find highest vote-getter
-        let eliminated = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
-        logText += `<p><strong>${eliminated} is voted out.</strong></p>`;
+        const eliminated = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
+        html += `<p><strong>${eliminated} is voted out.</strong></p>`;
 
-        // Remove from tribe
-        tribes[losingTribe] = tribeMembers.filter(p => p !== eliminated);
+        tribes[losing] = tribe.filter(p => p !== eliminated);
     }
 
-    // 4. Check for winner
+    // WINNER CHECK
     const remaining = [...tribes.A, ...tribes.B];
     if (remaining.length === 1) {
-        logText += `<h2>${remaining[0]} wins Survivor!</h2>`;
+        html += `<h2>${remaining[0]} wins Survivor!</h2>`;
         document.getElementById("nextEpisodeBtn").disabled = true;
     }
 
-    setLog(logText);
+    setLog(html);
     episode++;
 }
 
