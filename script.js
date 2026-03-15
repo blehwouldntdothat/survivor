@@ -64,9 +64,21 @@ function assignTribes() {
     tribes.B = shuffled.slice(half);
 }
 
+function showImage(player) {
+    const src = photos[player] || "https://via.placeholder.com/80?text=No+Image";
+    return `<img class="contestant-photo" src="${src}" alt="${player}">`;
+}
+
+function showImages(playersArray) {
+    if (!playersArray || playersArray.length === 0) return "";
+    return `<div class="icon-grid">` +
+        playersArray.map(p => showImage(p)).join("") +
+        `</div>`;
+}
+
 function randomEvent(tribe) {
     if (tribe.length < 2) {
-        return showImage(tribe[0]) + `${tribe[0]} spends the day alone.`;
+        return showImages([tribe[0]]) + `${tribe[0]} spends the day alone.`;
     }
 
     const p1 = tribe[Math.floor(Math.random() * tribe.length)];
@@ -86,14 +98,7 @@ function randomEvent(tribe) {
     const event = events[Math.floor(Math.random() * events.length)];
     adjustRelationship(p1, p2, event.change);
 
-    return showImage(p1) + event.text;
-}
-
-function showImage(player) {
-    if (!photos[player]) {
-        return `<img class="contestant-photo" src="https://via.placeholder.com/80?text=No+Image">`;
-    }
-    return `<img class="contestant-photo" src="${photos[player]}">`;
+    return showImages([p1, p2]) + event.text;
 }
 
 function checkMerge() {
@@ -123,8 +128,8 @@ function showTrackRecord() {
     // HEADER ROW 1
     html += `<tr>
                 <th rowspan="2">Rank</th>
-                <th rowspan="2">Photo</th>
-                <th rowspan="2">Contestant</th>`;
+                <th rowspan="2">Contestant</th>
+                <th rowspan="2">Photo</th>`;
 
     for (let i = 1; i <= totalEpisodes; i++) {
         html += `<th>Ep. ${i}</th>`;
@@ -159,8 +164,8 @@ function showTrackRecord() {
     sortedPlayers.forEach(player => {
         html += `<tr>
                     <td>${stats[player].placement}</td>
-                    <td>${showImage(player)}</td>
-                    <td>${player}</td>`;
+                    <td>${player}</td>
+                    <td>${showImage(player)}</td>`;
 
         episodeResults.forEach(ep => {
             let result = ep.results[player] || "";
@@ -204,11 +209,14 @@ function runEpisode() {
     if (!merged) {
         const winning = Math.random() < 0.5 ? "A" : "B";
         losingTribe = winning === "A" ? "B" : "A";
-        html += `<p><strong>Immunity Challenge:</strong> Tribe ${winning} wins immunity!</p>`;
+        const winningTribeMembers = winning === "A" ? tribes.A : tribes.B;
+        html += showImages(winningTribeMembers) +
+            `<p><strong>Immunity Challenge:</strong> Tribe ${winning} wins immunity!</p>`;
     } else {
         immune = remaining[Math.floor(Math.random() * remaining.length)];
         stats[immune].immunityWins++;
-        html += showImage(immune) + `<p><strong>Individual Immunity:</strong> ${immune} wins immunity!</p>`;
+        html += showImages([immune]) +
+            `<p><strong>Individual Immunity:</strong> ${immune} wins immunity!</p>`;
     }
 
     // EVENTS
@@ -229,7 +237,8 @@ function runEpisode() {
 
     if (voters.length === 1) {
         eliminated = voters[0];
-        html += showImage(eliminated) + `<p>${eliminated} is automatically eliminated.</p>`;
+        html += showImages([eliminated]) +
+            `<p>${eliminated} is automatically eliminated.</p>`;
         stats[eliminated].placement = remaining.length;
 
         if (merged) tribes.Merged = [];
@@ -246,7 +255,8 @@ function runEpisode() {
 
         html += `<p><strong>Votes:</strong></p>`;
         for (const [voter, target] of Object.entries(votes)) {
-            html += showImage(voter) + `<p>${voter} voted for ${target}</p>`;
+            html += showImages([voter, target]) +
+                `<p>${voter} voted for ${target}</p>`;
         }
 
         let tally = {};
@@ -255,7 +265,8 @@ function runEpisode() {
         });
 
         eliminated = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
-        html += showImage(eliminated) + `<p><strong>${eliminated} is voted out.</strong></p>`;
+        html += showImages([eliminated]) +
+            `<p><strong>${eliminated} is voted out.</strong></p>`;
 
         stats[eliminated].votesReceived += tally[eliminated];
         stats[eliminated].placement = remaining.length;
@@ -290,7 +301,7 @@ function runEpisode() {
         const winner = finalRemaining[0];
         stats[winner].placement = 1;
 
-        html += showImage(winner) + `<h2>${winner} wins Survivor!</h2>`;
+        html += showImages([winner]) + `<h2>${winner} wins Survivor!</h2>`;
         setLog(html);
 
         showTrackRecord();
