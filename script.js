@@ -32,15 +32,27 @@ function initRelationships(players) {
     });
 }
 
+// 1–5 stats, default 3
 function initStats(players) {
     players.forEach(p => {
         stats[p] = {
+            // GAME STATS
             tribeHistory: [],
             immunityWins: 0,
             votesReceived: 0,
             votesCast: [],
             placement: null,
-            eliminatedEpisode: null
+            eliminatedEpisode: null,
+
+            // PERFORMANCE STATS (editable later, default 3)
+            physical: 3,
+            endurance: 3,
+            mental: 3,
+            social: 3,
+            temperament: 3,
+            luck: 3,
+            strategy: 3,
+            loyalty: 3
         };
     });
 }
@@ -77,11 +89,10 @@ function showImages(playersArray) {
         `</div>`;
 }
 
-/* NEW EVENT SYSTEM */
+/* NEW EVENT SYSTEM (already wired to your events.js) */
 function runEvent(tribe) {
     const size = tribe.length;
 
-    // Filter events that fit the tribe size
     const possible = EVENTS.filter(e =>
         (typeof e.players === "number" && e.players <= size) ||
         e.players === "tribe"
@@ -97,12 +108,47 @@ function runEvent(tribe) {
         chosenPlayers = shuffle([...tribe]).slice(0, event.players);
     }
 
-    // Apply relationship changes
     event.change.forEach(([a, b, amount]) => {
         adjustRelationship(chosenPlayers[a], chosenPlayers[b], amount);
     });
 
     return showImages(chosenPlayers) + event.text(chosenPlayers);
+}
+
+/* CHALLENGE HELPERS */
+
+function getRandomChallenge(type) {
+    const pool = CHALLENGES.filter(c => c.type === type);
+    if (pool.length === 0) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function computePlayerScore(player, weights) {
+    let score = 0;
+    for (const key in weights) {
+        if (stats[player][key] !== undefined) {
+            score += stats[player][key] * weights[key];
+        }
+    }
+    // small luck influence
+    score += stats[player].luck * 0.1;
+    return score;
+}
+
+function computeTribeScore(tribePlayers, weights) {
+    if (tribePlayers.length === 0) return 0;
+    let total = 0;
+    tribePlayers.forEach(p => {
+        total += computePlayerScore(p, weights);
+    });
+    return total / tribePlayers.length;
+}
+
+/* TIEBREAKER HELPERS */
+
+function getRandomTiebreaker() {
+    if (!TIEBREAKERS || TIEBREAKERS.length === 0) return null;
+    return TIEBREAKERS[Math.floor(Math.random() * TIEBREAKERS.length)];
 }
 
 function checkMerge() {
@@ -178,7 +224,6 @@ function showTrackRecord() {
         episodeResults.forEach((ep, index) => {
             const epNum = index + 1;
 
-            // Grey out all episodes AFTER elimination
             if (eliminatedEp && epNum > eliminatedEp) {
                 html += `<td style="background:#dddddd;"></td>`;
                 return;
@@ -193,23 +238,23 @@ function showTrackRecord() {
 
             if (result === "IMM") {
                 if (ep.phase === "Pre-Merge") {
-                    bg = "#55cc55"; // TEAM IMMUNITY
+                    bg = "#55cc55";
                 } else {
-                    bg = "#99ff99"; // INDIVIDUAL IMMUNITY
+                    bg = "#99ff99";
                 }
             }
 
             if (result === "SAFE") bg = "white";
 
             if (result === "TIE") {
-                bg = "#ffbb66"; // light orange
+                bg = "#ffbb66";
                 color = "black";
             }
 
             if (result === "TIEBRK") {
-                bg = "#cc5500"; // dark orange
+                bg = "#cc5500";
                 color = "white";
-                result = "TIE"; // display text
+                result = "TIE";
             }
 
             html += `<td style="background:${bg}; color:${color};">${result}</td>`;
@@ -223,29 +268,37 @@ function showTrackRecord() {
     document.getElementById("log").innerHTML += html;
 }
 
-// ---- TIEBREAKER SYSTEM ----
+// ---- TIEBREAKER SYSTEM (now stat-based) ----
 
 function runRandomCompetitionTiebreaker(tiedPlayers) {
-    const competitions = [
-        "Fire-making duel",
-        "Endurance challenge",
-        "Puzzle showdown",
-        "Balance challenge",
-        "Dexterity challenge",
-        "Memory challenge",
-        "Luck-based challenge",
-        "Speed challenge",
-        "Social duel",
-        "Random draw"
-    ];
-
-    const type = competitions[Math.floor(Math.random() * competitions.length)];
-    const loser = tiedPlayers[Math.floor(Math.random() * tiedPlayers.length)];
-
+    const tb = getRandomTiebreaker();
     let html = "";
+
+    if (!tb) {
+        const loser = tiedPlayers[Math.floor(Math.random() * tiedPlayers.length)];
+        html += showImages(tiedPlayers);
+        html += `<p><strong>Tiebreaker:</strong> Random draw.</p>`;
+        html += `<p>${loser} loses the tiebreaker and is eliminated.</p>`;
+        return { eliminated: loser, log: html };
+    }
+
     html += showImages(tiedPlayers);
-    html += `<p><strong>Tiebreaker Competition:</strong> ${type}!</p>`;
-    html += `<p>${loser} loses the tiebreaker and is eliminated.</p>`;
+    html += `<p><strong>Tiebreaker Competition:</strong> ${tb.name}</p>`;
+    html += `<p>${tb.description}</p>`;
+
+    let scores = tiedPlayers.map(p => ({
+        player: p,
+        score: computePlayerScore(p, tb.weights)
+    }));
+
+    scores.sort((a, b) => a.score - b.score);
+
+    const lowestScore = scores[0].score;
+    const lowestPlayers = scores.filter(s => s.score === lowestScore).map(s => s.player);
+
+    const loser = lowestPlayers[Math.floor(Math.random() * lowestPlayers.length)];
+
+    html += `<p>${loser} performs the worst in the tiebreaker and is eliminated.</p>`;
 
     return { eliminated: loser, log: html };
 }
@@ -263,18 +316,49 @@ function runEpisode() {
         html += `<p>The tribes merge into one group.</p>`;
     }
 
-    // IMMUNITY
+    // IMMUNITY (now challenge-based)
     let immune = null;
     let losingTribe = null;
+    let challenge = getRandomChallenge(merged ? "merge" : "tribe");
 
     if (!merged) {
-        const winning = Math.random() < 0.5 ? "A" : "B";
-        losingTribe = winning === "A" ? "B" : "A";
-        const winningTribeMembers = winning === "A" ? tribes.A : tribes.B;
-        html += showImages(winningTribeMembers) +
-            `<p><strong>Immunity Challenge:</strong> Tribe ${winning} wins immunity!</p>`;
+        if (!challenge) {
+            const winning = Math.random() < 0.5 ? "A" : "B";
+            losingTribe = winning === "A" ? "B" : "A";
+            const winningTribeMembers = winning === "A" ? tribes.A : tribes.B;
+            html += showImages(winningTribeMembers) +
+                `<p><strong>Immunity Challenge:</strong> Tribe ${winning} wins immunity!</p>`;
+        } else {
+            const tribeAScore = computeTribeScore(tribes.A, challenge.weights);
+            const tribeBScore = computeTribeScore(tribes.B, challenge.weights);
+
+            const winning = tribeAScore > tribeBScore ? "A" : "B";
+            losingTribe = winning === "A" ? "B" : "A";
+            const winningTribeMembers = winning === "A" ? tribes.A : tribes.B;
+
+            html += `<p><strong>Immunity Challenge:</strong> ${challenge.name}</p>`;
+            html += `<p>${challenge.description}</p>`;
+            html += showImages(winningTribeMembers) +
+                `<p>Tribe ${winning} wins immunity!</p>`;
+        }
     } else {
-        immune = remaining[Math.floor(Math.random() * remaining.length)];
+        if (!challenge) {
+            immune = remaining[Math.floor(Math.random() * remaining.length)];
+        } else {
+            let scores = remaining.map(p => ({
+                player: p,
+                score: computePlayerScore(p, challenge.weights)
+            }));
+            scores.sort((a, b) => b.score - a.score);
+
+            const topScore = scores[0].score;
+            const topPlayers = scores.filter(s => s.score === topScore).map(s => s.player);
+            immune = topPlayers[Math.floor(Math.random() * topPlayers.length)];
+
+            html += `<p><strong>Immunity Challenge:</strong> ${challenge.name}</p>`;
+            html += `<p>${challenge.description}</p>`;
+        }
+
         stats[immune].immunityWins++;
         html += showImages([immune]) +
             `<p><strong>Individual Immunity:</strong> ${immune} wins immunity!</p>`;
@@ -306,11 +390,28 @@ function runEpisode() {
         if (merged) tribes.Merged = [];
         else tribes[losingTribe] = [];
     } else {
-        // FIRST VOTE
+        // FIRST VOTE (stat-influenced)
         let votes = {};
         voters.forEach(voter => {
             let choices = voters.filter(p => p !== voter && p !== immune);
-            let voteFor = choices[Math.floor(Math.random() * choices.length)];
+
+            let weightedChoices = choices.map(target => {
+                const rel = relationships[voter]?.[target] ?? 50;
+
+                const weight =
+                    (6 - stats[voter].loyalty) * 0.4 +
+                    (6 - stats[target].social) * 0.2 +
+                    stats[target].strategy * 0.2 +
+                    (100 - rel) * 0.1 +
+                    Math.random() * stats[voter].temperament * 0.1 +
+                    Math.random() * stats[voter].luck * 0.1;
+
+                return { player: target, weight };
+            });
+
+            weightedChoices.sort((a, b) => b.weight - a.weight);
+
+            let voteFor = weightedChoices[0].player;
             votes[voter] = voteFor;
             stats[voter].votesCast.push(voteFor);
         });
@@ -346,7 +447,24 @@ function runEpisode() {
                 if (choices.length === 0) {
                     choices = tied.filter(p => p !== immune);
                 }
-                let voteFor = choices[Math.floor(Math.random() * choices.length)];
+
+                let weightedChoices = choices.map(target => {
+                    const rel = relationships[voter]?.[target] ?? 50;
+
+                    const weight =
+                        (6 - stats[voter].loyalty) * 0.4 +
+                        (6 - stats[target].social) * 0.2 +
+                        stats[target].strategy * 0.2 +
+                        (100 - rel) * 0.1 +
+                        Math.random() * stats[voter].temperament * 0.1 +
+                        Math.random() * stats[voter].luck * 0.1;
+
+                    return { player: target, weight };
+                });
+
+                weightedChoices.sort((a, b) => b.weight - a.weight);
+                let voteFor = weightedChoices[0].player;
+
                 revoteVotes[voter] = voteFor;
             });
 
@@ -371,8 +489,7 @@ function runEpisode() {
                 html += showImages([eliminated]) +
                     `<p><strong>${eliminated} is voted out after the revote.</strong></p>`;
             } else {
-                // DEADLOCK → RANDOM COMPETITION TIEBREAKER
-                html += `<p><strong>The revote is still tied. A random tiebreaker competition will decide who goes home.</strong></p>`;
+                html += `<p><strong>The revote is still tied. A tiebreaker competition will decide who goes home.</strong></p>`;
                 const tb = runRandomCompetitionTiebreaker(revoteTied);
                 eliminated = tb.eliminated;
                 html += tb.log;
@@ -389,7 +506,6 @@ function runEpisode() {
             tribes[losingTribe] = voters.filter(p => p !== eliminated);
         }
 
-        // RECORD EPISODE RESULTS
         let epData = { phase: merged ? "Merge" : "Pre-Merge", results: {} };
 
         remaining.forEach(p => {
@@ -398,18 +514,16 @@ function runEpisode() {
             } else if (p === immune) {
                 epData.results[p] = "IMM";
             } else if (!merged && tribes[losingTribe] && !tribes[losingTribe].includes(p)) {
-                epData.results[p] = "IMM"; // team immunity
+                epData.results[p] = "IMM";
             } else {
                 epData.results[p] = "SAFE";
             }
         });
 
-        // Mark TIE survivors
         tiedPlayersFirstVote.forEach(p => {
             if (p !== eliminated) epData.results[p] = "TIE";
         });
 
-        // Mark TIEBRK survivors
         tiedPlayersDeadlock.forEach(p => {
             if (p !== eliminated) epData.results[p] = "TIEBRK";
         });
@@ -417,7 +531,6 @@ function runEpisode() {
         episodeResults.push(epData);
     }
 
-    // WINNER CHECK
     const finalRemaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
     if (finalRemaining.length === 1) {
         const winner = finalRemaining[0];
@@ -461,7 +574,6 @@ document.getElementById("startBtn").onclick = () => {
         }
     });
 
-    // AUTO-MERGE MODE: Start merged if cast < 10
     if (cast.length < 10) {
         merged = true;
         tribes.A = [];
