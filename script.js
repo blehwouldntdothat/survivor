@@ -269,6 +269,12 @@ function computePlayerScore(player, weights) {
     return score;
 }
 
+function getRandomTiebreaker() {
+    if (!TIEBREAKERS || TIEBREAKERS.length === 0) return null;
+    return TIEBREAKERS[Math.floor(Math.random() * TIEBREAKERS.length)];
+}
+
+
 function runRandomCompetitionTiebreaker(tiedPlayers) {
     const tb = getRandomTiebreaker();
     let html = "";
@@ -300,6 +306,21 @@ function runRandomCompetitionTiebreaker(tiedPlayers) {
     html += `<p>${loser} performs the worst and is eliminated.</p>`;
 
     return { eliminated: loser, log: html };
+}
+
+function juryVote(juror, finalists) {
+    let best = finalists[0];
+    let bestScore = -Infinity;
+
+    finalists.forEach(f => {
+        const rel = relationships[juror]?.[f] ?? 50;
+        if (rel > bestScore) {
+            bestScore = rel;
+            best = f;
+        }
+    });
+
+    return best;
 }
 
 function runFinale(finalists) {
