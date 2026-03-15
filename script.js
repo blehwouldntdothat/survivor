@@ -436,6 +436,34 @@ function nullifyVotes(votes, protectedPlayer) {
     return { newVotes, nullifiedCount };
 }
 
+function showTrackRecord() {
+    let html = `<h3>Track Record</h3>`;
+
+    html += `<table class="trackTable"><tr><th>Player</th>`;
+
+    episodeResults.forEach((_, i) => {
+        html += `<th>Ep ${i + 1}</th>`;
+    });
+
+    html += `<th>Placement</th></tr>`;
+
+    cast.forEach(p => {
+        html += `<tr><td>${p}</td>`;
+
+        episodeResults.forEach(ep => {
+            const result = ep.results[p] || "";
+            html += `<td>${result}</td>`;
+        });
+
+        html += `<td>${stats[p].placement || ""}</td></tr>`;
+    });
+
+    html += `</table>`;
+
+    setLog(html);
+}
+
+
 /* ============================================================
    IDOL EXPIRATION (NEW)
    ============================================================ */
