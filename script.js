@@ -220,6 +220,11 @@ function checkMerge() {
     return false;
 }
 
+function getRandomChallenge(type) {
+    const pool = CHALLENGES.filter(c => c.type === type);
+    if (pool.length === 0) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+}
 
 /* ============================================================
    IDOL EXPIRATION (NEW)
