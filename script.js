@@ -269,6 +269,109 @@ function computePlayerScore(player, weights) {
     return score;
 }
 
+function runRandomCompetitionTiebreaker(tiedPlayers) {
+    const tb = getRandomTiebreaker();
+    let html = "";
+
+    if (!tb) {
+        const loser = tiedPlayers[Math.floor(Math.random() * tiedPlayers.length)];
+        html += showImages(tiedPlayers);
+        html += `<p><strong>Tiebreaker:</strong> Random draw.</p>`;
+        html += `<p>${loser} loses the tiebreaker.</p>`;
+        return { eliminated: loser, log: html };
+    }
+
+    html += showImages(tiedPlayers);
+    html += `<p><strong>Tiebreaker:</strong> ${tb.name}</p>`;
+    html += `<p>${tb.description}</p>`;
+
+    let scores = tiedPlayers.map(p => ({
+        player: p,
+        score: computePlayerScore(p, tb.weights)
+    }));
+
+    scores.sort((a, b) => a.score - b.score);
+
+    const lowestScore = scores[0].score;
+    const lowestPlayers = scores.filter(s => s.score === lowestScore).map(s => s.player);
+
+    const loser = lowestPlayers[Math.floor(Math.random() * lowestPlayers.length)];
+
+    html += `<p>${loser} performs the worst and is eliminated.</p>`;
+
+    return { eliminated: loser, log: html };
+}
+
+function runFinale(finalists) {
+    finaleFinalists = [...finalists];
+
+    let html = `<h3>Final Tribal Council (${finalists.length} finalists)</h3>`;
+
+    html += showImages(finalists);
+    html += `<p>The finalists face the jury.</p>`;
+
+    if (jury.length === 0) {
+        html += `<p>No jury exists. A random winner is chosen.</p>`;
+        const winner = finalists[Math.floor(Math.random() * finalists.length)];
+        finaleWinner = winner;
+
+        stats[winner].placement = 1;
+        finalists.forEach(p => {
+            if (p !== winner) stats[p].placement = 2;
+        });
+
+        html += showImages([winner]) + `<h2>${winner} wins Survivor</h2>`;
+        setLog(html);
+        showTrackRecord();
+        document.getElementById("nextEpisodeBtn").disabled = true;
+        return;
+    }
+
+    html += `<h4>Jury Votes</h4>`;
+
+    let voteTally = {};
+    finalists.forEach(f => voteTally[f] = 0);
+
+    jury.forEach(juror => {
+        const voteFor = juryVote(juror, finalists);
+        voteTally[voteFor]++;
+        stats[juror].votedForWinner = voteFor;
+
+        html += showImages([juror, voteFor]) +
+            `<p>${juror} votes for ${voteFor}.</p>`;
+    });
+
+    let maxVotes = Math.max(...Object.values(voteTally));
+    let winners = Object.keys(voteTally).filter(p => voteTally[p] === maxVotes);
+
+    let winner;
+    if (winners.length === 1) {
+        winner = winners[0];
+    } else {
+        winner = winners[Math.floor(Math.random() * winners.length)];
+        html += `<p>The jury is tied. By random draw, ${winner} wins.</p>`;
+    }
+
+    finaleWinner = winner;
+
+    stats[winner].placement = 1;
+    finalists.forEach(p => {
+        if (p !== winner) stats[p].placement = 2;
+    });
+
+    html += `<h4>Final Vote Tally</h4><ul>`;
+    finalists.forEach(f => {
+        html += `<li>${f}: ${voteTally[f]} vote(s)</li>`;
+    });
+    html += `</ul>`;
+
+    html += showImages([winner]) + `<h2>${winner} wins Survivor</h2>`;
+
+    setLog(html);
+    showTrackRecord();
+    document.getElementById("nextEpisodeBtn").disabled = true;
+}
+
 function handleIdolPlay(voters, immune) {
     let html = "";
     let playedBy = null;
