@@ -77,29 +77,32 @@ function showImages(playersArray) {
         `</div>`;
 }
 
-function randomEvent(tribe) {
-    if (tribe.length < 2) {
-        return showImages([tribe[0]]) + `${tribe[0]} spends the day alone.`;
+/* NEW EVENT SYSTEM */
+function runEvent(tribe) {
+    const size = tribe.length;
+
+    // Filter events that fit the tribe size
+    const possible = EVENTS.filter(e =>
+        (typeof e.players === "number" && e.players <= size) ||
+        e.players === "tribe"
+    );
+
+    const event = possible[Math.floor(Math.random() * possible.length)];
+
+    let chosenPlayers;
+
+    if (event.players === "tribe") {
+        chosenPlayers = [...tribe];
+    } else {
+        chosenPlayers = shuffle([...tribe]).slice(0, event.players);
     }
 
-    const p1 = tribe[Math.floor(Math.random() * tribe.length)];
-    let p2 = p1;
-    while (p2 === p1) {
-        p2 = tribe[Math.floor(Math.random() * tribe.length)];
-    }
+    // Apply relationship changes
+    event.change.forEach(([a, b, amount]) => {
+        adjustRelationship(chosenPlayers[a], chosenPlayers[b], amount);
+    });
 
-    const events = [
-        { text: `${p1} and ${p2} bond over camp life.`, change: +10 },
-        { text: `${p1} annoys ${p2} with their attitude.`, change: -10 },
-        { text: `${p1} finds some extra food.`, change: +5 },
-        { text: `${p1} and ${p2} argue about strategy.`, change: -8 },
-        { text: `${p1} takes a nap instead of working.`, change: 0 }
-    ];
-
-    const event = events[Math.floor(Math.random() * events.length)];
-    adjustRelationship(p1, p2, event.change);
-
-    return showImages([p1, p2]) + event.text;
+    return showImages(chosenPlayers) + event.text(chosenPlayers);
 }
 
 function checkMerge() {
@@ -170,7 +173,7 @@ function showTrackRecord() {
                     <td>${player}</td>
                     <td>${showImage(player)}</td>`;
 
-        const eliminatedEp = stats[player].eliminatedEpisode; // null for winner
+        const eliminatedEp = stats[player].eliminatedEpisode;
 
         episodeResults.forEach((ep, index) => {
             const epNum = index + 1;
@@ -189,23 +192,22 @@ function showTrackRecord() {
             if (result === "OUT") bg = "#ff9999";
 
             if (result === "IMM") {
-                // Team vs individual immunity by phase
                 if (ep.phase === "Pre-Merge") {
-                    bg = "#55cc55"; // darker green for team immunity
+                    bg = "#55cc55"; // TEAM IMMUNITY
                 } else {
-                    bg = "#99ff99"; // lighter green for individual immunity
+                    bg = "#99ff99"; // INDIVIDUAL IMMUNITY
                 }
             }
 
             if (result === "SAFE") bg = "white";
 
             if (result === "TIE") {
-                bg = "#ffbb66"; // lighter orange
+                bg = "#ffbb66"; // light orange
                 color = "black";
             }
 
             if (result === "TIEBRK") {
-                bg = "#cc5500"; // darker orange
+                bg = "#cc5500"; // dark orange
                 color = "white";
                 result = "TIE"; // display text
             }
@@ -281,11 +283,11 @@ function runEpisode() {
     // EVENTS
     html += `<h4>Post-Challenge Events</h4>`;
     if (!merged) {
-        html += `<p>${randomEvent(tribes.A)}</p>`;
-        html += `<p>${randomEvent(tribes.B)}</p>`;
+        html += `<p>${runEvent(tribes.A)}</p>`;
+        html += `<p>${runEvent(tribes.B)}</p>`;
     } else {
-        html += `<p>${randomEvent(remaining)}</p>`;
-        html += `<p>${randomEvent(remaining)}</p>`;
+        html += `<p>${runEvent(remaining)}</p>`;
+        html += `<p>${runEvent(remaining)}</p>`;
     }
 
     // TRIBAL COUNCIL
@@ -484,9 +486,4 @@ document.getElementById("startBtn").onclick = () => {
         setLog(`
             <h3>Season Begins!</h3>
             <p><strong>Tribe A:</strong> ${tribes.A.join(", ")}</p>
-            <p><strong>Tribe B:</strong> ${tribes.B.join(", ")}</p>
-        `);
-    }
-};
-
-document.getElementById("nextEpisodeBtn").onclick = runEpisode;
+            <p><strong>Tribe B:</strong> ${
