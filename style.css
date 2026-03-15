@@ -28,7 +28,6 @@ img.contestant-photo {
     border-radius: 4px;
 }
 
-/* Track record icons have NO outline */
 table img.contestant-photo {
     outline: none !important;
     margin-left: auto;
@@ -52,11 +51,25 @@ table img.contestant-photo {
     margin-bottom: 6px;
 }
 
-/* Outline ONLY in episode log + events */
 #log img.contestant-photo,
 .icon-grid img.contestant-photo {
     outline: 2px solid rgba(0,0,0,0.15);
     outline-offset: 2px;
+}
+
+/* ============================
+   IDOL FOUND BOX
+   ============================ */
+
+.idolFoundBox {
+    background: rgba(255, 80, 80, 0.15);
+    border-radius: 10px;
+    padding: 12px;
+    margin: 10px auto;
+    max-width: 700px;
+    color: #cc0000;
+    font-weight: bold;
+    text-align: center;
 }
 
 /* ============================
@@ -71,7 +84,6 @@ table img.contestant-photo {
     text-align: center;
 }
 
-/* Center all table text (track record) */
 table {
     margin-left: auto;
     margin-right: auto;
