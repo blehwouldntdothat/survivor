@@ -486,9 +486,8 @@ document.getElementById("startBtn").onclick = () => {
         setLog(`
             <h3>Season Begins!</h3>
             <p><strong>Tribe A:</strong> ${tribes.A.join(", ")}</p>
-            <p><strong>Tribe B:</strong> ${        
             <p><strong>Tribe B:</strong> ${tribes.B.join(", ")}</p>
-    `);
+        `);
     }
 };
 
