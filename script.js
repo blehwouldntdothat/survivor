@@ -39,7 +39,8 @@ function initStats(players) {
             immunityWins: 0,
             votesReceived: 0,
             votesCast: [],
-            placement: null
+            placement: null,
+            eliminatedEpisode: null
         };
     });
 }
@@ -169,22 +170,33 @@ function showTrackRecord() {
                     <td>${player}</td>
                     <td>${showImage(player)}</td>`;
 
-        let eliminatedAt = stats[player].placement;
+        const eliminatedEp = stats[player].eliminatedEpisode; // null for winner
 
         episodeResults.forEach((ep, index) => {
-            let result = ep.results[player] || "";
+            const epNum = index + 1;
 
-            // GREY OUT FUTURE EPISODES AFTER ELIMINATION
-            if (index + 1 > episodeResults.length - eliminatedAt) {
+            // Grey out all episodes AFTER elimination
+            if (eliminatedEp && epNum > eliminatedEp) {
                 html += `<td style="background:#dddddd;"></td>`;
                 return;
             }
+
+            let result = ep.results[player] || "";
 
             let bg = "white";
             let color = "black";
 
             if (result === "OUT") bg = "#ff9999";
-            if (result === "IMM") bg = "#99ff99";
+
+            if (result === "IMM") {
+                // Team vs individual immunity by phase
+                if (ep.phase === "Pre-Merge") {
+                    bg = "#55cc55"; // darker green for team immunity
+                } else {
+                    bg = "#99ff99"; // lighter green for individual immunity
+                }
+            }
+
             if (result === "SAFE") bg = "white";
 
             if (result === "TIE") {
@@ -195,7 +207,7 @@ function showTrackRecord() {
             if (result === "TIEBRK") {
                 bg = "#cc5500"; // darker orange
                 color = "white";
-                result = "tie"; // display text
+                result = "TIE"; // display text
             }
 
             html += `<td style="background:${bg}; color:${color};">${result}</td>`;
@@ -287,6 +299,7 @@ function runEpisode() {
         html += showImages([eliminated]) +
             `<p>${eliminated} is automatically eliminated.</p>`;
         stats[eliminated].placement = remaining.length;
+        stats[eliminated].eliminatedEpisode = episode;
 
         if (merged) tribes.Merged = [];
         else tribes[losingTribe] = [];
@@ -366,6 +379,7 @@ function runEpisode() {
 
         stats[eliminated].votesReceived += (tally[eliminated] || 0);
         stats[eliminated].placement = remaining.length;
+        stats[eliminated].eliminatedEpisode = episode;
 
         if (merged) {
             tribes.Merged = voters.filter(p => p !== eliminated);
@@ -382,7 +396,7 @@ function runEpisode() {
             } else if (p === immune) {
                 epData.results[p] = "IMM";
             } else if (!merged && tribes[losingTribe] && !tribes[losingTribe].includes(p)) {
-                epData.results[p] = "IMM";
+                epData.results[p] = "IMM"; // team immunity
             } else {
                 epData.results[p] = "SAFE";
             }
@@ -406,6 +420,7 @@ function runEpisode() {
     if (finalRemaining.length === 1) {
         const winner = finalRemaining[0];
         stats[winner].placement = 1;
+        stats[winner].eliminatedEpisode = null;
 
         html += showImages([winner]) + `<h2>${winner} wins Survivor!</h2>`;
         setLog(html);
@@ -430,6 +445,8 @@ document.getElementById("startBtn").onclick = () => {
     tribes = { A: [], B: [], Merged: [] };
     episode = 1;
     episodeResults = [];
+    relationships = {};
+    stats = {};
 
     lines.forEach(line => {
         let parts = line.split(",");
