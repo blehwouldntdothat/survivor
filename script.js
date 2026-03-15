@@ -130,7 +130,6 @@ function showTrackRecord() {
         let phase = episodeResults[i].phase;
         let span = 1;
 
-        // Count consecutive identical phases
         while (
             i + span < episodeResults.length &&
             episodeResults[i + span].phase === phase
@@ -144,7 +143,7 @@ function showTrackRecord() {
 
     html += `</tr>`;
 
-    // BODY ROWS (CONTESTANTS)
+    // BODY ROWS
     const sortedPlayers = Object.keys(stats).sort((a, b) => stats[a].placement - stats[b].placement);
 
     sortedPlayers.forEach(player => {
@@ -157,11 +156,14 @@ function showTrackRecord() {
 
             // Color coding
             let bg = "#dddddd"; // blank = grey
-            if (result === "OUT") bg = "#ff9999"; // red
-            if (result === "IMM") bg = "#99ff99"; // green
-            if (result === "SAFE") bg = "white"; // white
+            if (result === "OUT") bg = "#ff9999";        // red
+            if (result === "IMM") bg = "#99ff99";        // bright green
+            if (result === "TIMM") bg = "#66cc66";       // darker green
+            if (result === "SAFE") bg = "white";         // white
 
-            html += `<td style="background:${bg};">${result}</td>`;
+            let display = result === "TIMM" ? "IMM" : result;
+
+            html += `<td style="background:${bg};">${display}</td>`;
         });
 
         html += `</tr>`;
@@ -259,8 +261,13 @@ function runEpisode() {
     let epData = { phase: merged ? "Merge" : "Pre-Merge", results: {} };
 
     remaining.forEach(p => {
-        if (p === immune) epData.results[p] = "IMM";
-        else epData.results[p] = "SAFE";
+        if (p === immune) {
+            epData.results[p] = "IMM"; // individual immunity
+        } else if (!merged && tribes[losingTribe] && !tribes[losingTribe].includes(p)) {
+            epData.results[p] = "TIMM"; // tribal immunity
+        } else {
+            epData.results[p] = "SAFE";
+        }
     });
 
     if (eliminated) epData.results[eliminated] = "OUT";
