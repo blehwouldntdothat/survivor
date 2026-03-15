@@ -533,8 +533,7 @@ function runEpisode() {
 
         stats[immune].immunityWins++;
         html += showImages([immune]) +
-            `<p><strong>Individual Immunity:</strong> ${immune} wins immunity.</p    html += showImages([immune]) +
-        `<p><strong>Individual Immunity:</strong> ${immune} wins immunity.</p>`;
+            `<p><strong>Individual Immunity:</strong> ${immune} wins immunity.</p>`;
     }
 
     /* EVENTS */
