@@ -226,6 +226,17 @@ function getRandomChallenge(type) {
     return pool[Math.floor(Math.random() * pool.length)];
 }
 
+function computePlayerScore(player, weights) {
+    let score = 0;
+    for (const key in weights) {
+        if (stats[player][key] !== undefined) {
+            score += stats[player][key] * weights[key];
+        }
+    }
+    score += stats[player].luck * 0.2;
+    return score;
+}
+
 /* ============================================================
    IDOL EXPIRATION (NEW)
    ============================================================ */
