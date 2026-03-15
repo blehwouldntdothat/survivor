@@ -21,6 +21,9 @@ let finaleSize = null;
 let finaleFinalists = [];
 let finaleWinner = null;
 
+// SETTINGS
+let finaleSetting = "random";
+
 /* ============================================================
    BASIC HELPERS
    ============================================================ */
@@ -60,7 +63,6 @@ function initRelationships(players) {
     });
 }
 
-// 1–5 stats, default 3
 function initStats(players) {
     players.forEach(p => {
         stats[p] = {
@@ -180,7 +182,7 @@ function getRandomTiebreaker() {
 }
 
 /* ============================================================
-   TRACK RECORD (with finale column)
+   TRACK RECORD
    ============================================================ */
 
 function showTrackRecord() {
@@ -190,7 +192,6 @@ function showTrackRecord() {
 
     html += `<table border="1" cellpadding="6" style="margin:auto; border-collapse:collapse;">`;
 
-    /* HEADER ROW 1 */
     html += `<tr>
                 <th rowspan="2">Rank</th>
                 <th rowspan="2">Contestant</th>
@@ -200,11 +201,9 @@ function showTrackRecord() {
         html += `<th>Ep. ${i}</th>`;
     }
 
-    // Finale column header uses episode number
     html += `<th>Ep. ${episode}</th>`;
     html += `</tr>`;
 
-    /* HEADER ROW 2 (PHASE CELLS) */
     html += `<tr>`;
 
     let i = 0;
@@ -223,11 +222,9 @@ function showTrackRecord() {
         i += span;
     }
 
-    // Finale phase cell
     html += `<td style="background:#ddd; font-weight:bold;">Final</td>`;
     html += `</tr>`;
 
-    /* BODY ROWS */
     const sortedPlayers = Object.keys(stats).sort((a, b) => stats[a].placement - stats[b].placement);
 
     let runnerUps = [];
@@ -242,7 +239,6 @@ function showTrackRecord() {
 
         html += `<tr>`;
 
-        /* Placement cell with rowspan for Final 3 */
         if (placement === 2 && isRunnerUp) {
             if (!printedSecondPlace) {
                 html += `<td rowspan="2">2</td>`;
@@ -257,7 +253,6 @@ function showTrackRecord() {
 
         const eliminatedEp = stats[player].eliminatedEpisode;
 
-        /* Episode cells */
         episodeResults.forEach((ep, index) => {
             const epNum = index + 1;
 
@@ -284,7 +279,6 @@ function showTrackRecord() {
             html += `<td style="background:${bg}; color:${color};">${result}</td>`;
         });
 
-        /* FINAL COLUMN */
         if (jury.includes(player)) {
             const votedFor = stats[player].votedForWinner || "—";
             html += `<td style="background:#e6e6e6; color:black; text-align:center;">
@@ -298,7 +292,6 @@ function showTrackRecord() {
                 html += `<td style="background:#c0c0c0; font-weight:bold; text-align:center;">RUNNER-UP</td>`;
             }
         } else {
-            // Non-jurors get blank grey (#dddddd)
             html += `<td style="background:#dddddd;"></td>`;
         }
 
@@ -330,7 +323,7 @@ function juryVote(juror, finalists) {
 }
 
 /* ============================================================
-   FINALE (Final 2 or Final 3)
+   FINALE
    ============================================================ */
 
 function runFinale(finalists) {
@@ -474,18 +467,17 @@ function runEpisode() {
 
     const remaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
 
-    // Randomly choose Final 2 or Final 3 once
     if (!finaleSize) {
-        finaleSize = Math.random() < 0.5 ? 2 : 3;
+        if (finaleSetting === "f2") finaleSize = 2;
+        else if (finaleSetting === "f3") finaleSize = 3;
+        else finaleSize = Math.random() < 0.5 ? 2 : 3;
     }
 
-    // If at finale size, run finale
     if (remaining.length === finaleSize) {
         runFinale(remaining);
         return;
     }
 
-    // MERGE CHECK
     if (checkMerge()) {
         html += `<h2>Merge!</h2>`;
         html += `<p>The tribes merge into one group.</p>`;
@@ -493,7 +485,6 @@ function runEpisode() {
 
     const currentRemaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
 
-    /* IMMUNITY CHALLENGE */
     let immune = null;
     let losingTribe = null;
     let challenge = getRandomChallenge(merged ? "merge" : "tribe");
@@ -536,7 +527,6 @@ function runEpisode() {
             `<p><strong>Individual Immunity:</strong> ${immune} wins immunity.</p>`;
     }
 
-    /* EVENTS */
     html += `<h4>Post-Challenge Events</h4>`;
     if (!merged) {
         html += `<p>${runEvent(tribes.A)}</p>`;
@@ -546,7 +536,6 @@ function runEpisode() {
         html += `<p>${runEvent(currentRemaining)}</p>`;
     }
 
-    /* TRIBAL COUNCIL */
     html += `<h4>Tribal Council</h4>`;
 
     let voters = merged ? currentRemaining : tribes[losingTribe];
@@ -562,14 +551,13 @@ function runEpisode() {
         if (merged) tribes.Merged = [];
         else tribes[losingTribe] = [];
     } else {
-        /* FIRST VOTE */
         let votes = {};
         voters.forEach(voter => {
             let choices = voters.filter(p => p !== voter && p !== immune);
 
             let weightedChoices = choices.map(target => {
                 const rel = relationships[voter]?.[target] ?? 50;
-
+               
                 const weight =
                     (6 - stats[voter].loyalty) * 0.4 +
                     (6 - stats[target].social) * 0.2 +
@@ -610,7 +598,6 @@ function runEpisode() {
             html += showImages([eliminated]) +
                 `<p><strong>${eliminated} is voted out.</strong></p>`;
         } else {
-            /* REVOTE */
             html += `<p><strong>The vote is tied between ${tied.join(", ")}. They will revote.</strong></p>`;
 
             let revoteVotes = {};
@@ -672,7 +659,6 @@ function runEpisode() {
         stats[eliminated].placement = currentRemaining.length;
         stats[eliminated].eliminatedEpisode = episode;
 
-        /* Add to jury if merge phase */
         const wasMerged = merged || tribes.Merged.includes(eliminated);
         if (wasMerged) {
             jury.push(eliminated);
@@ -684,7 +670,6 @@ function runEpisode() {
             tribes[losingTribe] = voters.filter(p => p !== eliminated);
         }
 
-        /* EPISODE RESULT LOGGING */
         let epData = { phase: merged ? "Merge" : "Pre-Merge", results: {} };
 
         currentRemaining.forEach(p => {
@@ -715,7 +700,7 @@ function runEpisode() {
 }
 
 /* ============================================================
-   MAIN MENU: CAST + STAT EDITOR
+   MAIN MENU: CAST + STAT EDITOR + SETTINGS
    ============================================================ */
 
 function renderCastList() {
@@ -775,11 +760,11 @@ function addContestant() {
 function openStatEditor() {
     if (cast.length === 0) return;
 
-    // Ensure stats/relationships exist for all
     initRelationships(cast);
     initStats(cast);
 
-    document.getElementById("mainMenu").style.display = "block";
+    document.getElementById("mainMenu").style.display = "none";
+    document.getElementById("settingsMenu").style.display = "none";
     document.getElementById("game").style.display = "none";
     document.getElementById("statEditor").style.display = "block";
 
@@ -866,14 +851,37 @@ function saveStatsAndReturn() {
     });
 
     document.getElementById("statEditor").style.display = "none";
+    document.getElementById("mainMenu").style.display = "block";
 }
 
 /* ============================================================
-   SETUP + BUTTONS
+   SETTINGS MENU
+   ============================================================ */
+
+function openSettings() {
+    document.getElementById("mainMenu").style.display = "none";
+    document.getElementById("statEditor").style.display = "none";
+    document.getElementById("game").style.display = "none";
+    document.getElementById("settingsMenu").style.display = "block";
+
+    document.getElementById("finaleSetting").value = finaleSetting;
+}
+
+function saveSettings() {
+    finaleSetting = document.getElementById("finaleSetting").value;
+
+    document.getElementById("settingsMenu").style.display = "none";
+    document.getElementById("mainMenu").style.display = "block";
+}
+
+/* ============================================================
+   START SEASON
    ============================================================ */
 
 document.getElementById("addContestantBtn").onclick = addContestant;
 document.getElementById("editStatsBtn").onclick = openStatEditor;
+document.getElementById("settingsBtn").onclick = openSettings;
+document.getElementById("saveSettingsBtn").onclick = saveSettings;
 document.getElementById("saveStatsBtn").onclick = saveStatsAndReturn;
 
 document.getElementById("startBtn").onclick = () => {
@@ -888,7 +896,6 @@ document.getElementById("startBtn").onclick = () => {
     finaleFinalists = [];
     finaleWinner = null;
 
-    // Ensure stats/relationships exist
     initRelationships(cast);
     initStats(cast);
 
@@ -903,6 +910,7 @@ document.getElementById("startBtn").onclick = () => {
 
     document.getElementById("mainMenu").style.display = "none";
     document.getElementById("statEditor").style.display = "none";
+    document.getElementById("settingsMenu").style.display = "none";
     document.getElementById("game").style.display = "block";
 
     if (merged) {
