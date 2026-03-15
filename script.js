@@ -193,6 +193,14 @@ function runEventWithIdols(tribePlayers, tribeName) {
     return html;
 }
 
+function recordTribeHistory() {
+    [...tribes.A, ...tribes.B, ...tribes.Merged].forEach(p => {
+        if (tribes.A.includes(p)) stats[p].tribeHistory.push("A");
+        else if (tribes.B.includes(p)) stats[p].tribeHistory.push("B");
+        else stats[p].tribeHistory.push("Merged");
+    });
+}
+
 /* ============================================================
    IDOL EXPIRATION (NEW)
    ============================================================ */
