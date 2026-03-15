@@ -7,11 +7,12 @@ let merged = false;
 let mergeAt = Math.floor(Math.random() * 4) + 8;
 let minMergeEpisode = 4 + Math.floor(Math.random() * 2);
 
-// RELATIONSHIPS + STATS + EPISODE RESULTS + PHOTOS
+// RELATIONSHIPS + STATS + EPISODE RESULTS + PHOTOS + JURY
 let relationships = {};
 let stats = {};
 let episodeResults = [];
 let photos = {};
+let jury = [];
 
 function setLog(html) {
     document.getElementById("log").innerHTML = html;
@@ -32,7 +33,7 @@ function initRelationships(players) {
     });
 }
 
-// 1–5 stats, default 3
+// 1–5 stats, default 3 (we’ll add a stat editor later)
 function initStats(players) {
     players.forEach(p => {
         stats[p] = {
@@ -89,7 +90,7 @@ function showImages(playersArray) {
         `</div>`;
 }
 
-/* NEW EVENT SYSTEM (already wired to your events.js) */
+/* EVENTS (from events.js) */
 function runEvent(tribe) {
     const size = tribe.length;
 
@@ -97,6 +98,8 @@ function runEvent(tribe) {
         (typeof e.players === "number" && e.players <= size) ||
         e.players === "tribe"
     );
+
+    if (possible.length === 0) return "";
 
     const event = possible[Math.floor(Math.random() * possible.length)];
 
@@ -115,7 +118,7 @@ function runEvent(tribe) {
     return showImages(chosenPlayers) + event.text(chosenPlayers);
 }
 
-/* CHALLENGE HELPERS */
+/* CHALLENGES (from challenges.js) */
 
 function getRandomChallenge(type) {
     const pool = CHALLENGES.filter(c => c.type === type);
@@ -131,12 +134,12 @@ function computePlayerScore(player, weights) {
         }
     }
     // small luck influence
-    score += stats[player].luck * 0.1;
+    score += stats[player].luck * 0.2;
     return score;
 }
 
 function computeTribeScore(tribePlayers, weights) {
-    if (tribePlayers.length === 0) return 0;
+    if (!tribePlayers || tribePlayers.length === 0) return 0;
     let total = 0;
     tribePlayers.forEach(p => {
         total += computePlayerScore(p, weights);
@@ -144,30 +147,11 @@ function computeTribeScore(tribePlayers, weights) {
     return total / tribePlayers.length;
 }
 
-/* TIEBREAKER HELPERS */
+/* TIEBREAKERS (from tiebreakers.js) */
 
 function getRandomTiebreaker() {
     if (!TIEBREAKERS || TIEBREAKERS.length === 0) return null;
     return TIEBREAKERS[Math.floor(Math.random() * TIEBREAKERS.length)];
-}
-
-function checkMerge() {
-    if (merged) return false;
-
-    const remaining = [...tribes.A, ...tribes.B];
-
-    if (!merged &&
-        remaining.length <= mergeAt &&
-        episode >= minMergeEpisode) {
-
-        merged = true;
-        tribes.Merged = remaining;
-        tribes.A = [];
-        tribes.B = [];
-        return true;
-    }
-
-    return false;
 }
 
 function showTrackRecord() {
@@ -268,7 +252,99 @@ function showTrackRecord() {
     document.getElementById("log").innerHTML += html;
 }
 
-// ---- TIEBREAKER SYSTEM (now stat-based) ----
+/* JURY VOTING (relationships only) */
+
+function juryVote(juror, finalists) {
+    let best = finalists[0];
+    let bestScore = -Infinity;
+
+    finalists.forEach(f => {
+        const rel = relationships[juror]?.[f] ?? 50;
+        if (rel > bestScore) {
+            bestScore = rel;
+            best = f;
+        }
+    });
+
+    return best;
+}
+
+/* FINALE: FINAL 3 + JURY */
+
+function runFinale(finalists) {
+    let html = `<h3>Final Tribal Council</h3>`;
+
+    html += showImages(finalists);
+    html += `<p>The final three face the jury.</p>`;
+
+    if (jury.length === 0) {
+        html += `<p>No jury exists. The simulator will randomly pick a winner.</p>`;
+        const winner = finalists[Math.floor(Math.random() * finalists.length)];
+        stats[winner].placement = 1;
+        stats[winner].eliminatedEpisode = null;
+
+        finalists.forEach(p => {
+            if (p !== winner) {
+                stats[p].placement = 2;
+                stats[p].eliminatedEpisode = episode;
+            }
+        });
+
+        html += showImages([winner]) + `<h2>${winner} wins Survivor!</h2>`;
+        setLog(html);
+        showTrackRecord();
+        document.getElementById("nextEpisodeBtn").disabled = true;
+        return;
+    }
+
+    html += `<h4>Jury Votes</h4>`;
+
+    let voteTally = {};
+    finalists.forEach(f => voteTally[f] = 0);
+
+    jury.forEach(juror => {
+        const voteFor = juryVote(juror, finalists);
+        voteTally[voteFor]++;
+
+        html += showImages([juror, voteFor]) +
+            `<p>${juror} votes for ${voteFor} to win.</p>`;
+    });
+
+    let maxVotes = Math.max(...Object.values(voteTally));
+    let winners = Object.keys(voteTally).filter(p => voteTally[p] === maxVotes);
+
+    let winner;
+    if (winners.length === 1) {
+        winner = winners[0];
+    } else {
+        winner = winners[Math.floor(Math.random() * winners.length)];
+        html += `<p>The jury vote is tied. By random draw, ${winner} wins.</p>`;
+    }
+
+    stats[winner].placement = 1;
+    stats[winner].eliminatedEpisode = null;
+
+    finalists.forEach(p => {
+        if (p !== winner) {
+            stats[p].placement = 2;
+            stats[p].eliminatedEpisode = episode;
+        }
+    });
+
+    html += `<h4>Final Vote Tally</h4><ul>`;
+    finalists.forEach(f => {
+        html += `<li>${f}: ${voteTally[f]} vote(s)</li>`;
+    });
+    html += `</ul>`;
+
+    html += showImages([winner]) + `<h2>${winner} wins Survivor!</h2>`;
+
+    setLog(html);
+    showTrackRecord();
+    document.getElementById("nextEpisodeBtn").disabled = true;
+}
+
+/* TIEBREAKER SYSTEM (stat-based) */
 
 function runRandomCompetitionTiebreaker(tiedPlayers) {
     const tb = getRandomTiebreaker();
@@ -303,6 +379,29 @@ function runRandomCompetitionTiebreaker(tiedPlayers) {
     return { eliminated: loser, log: html };
 }
 
+/* MERGE CHECK */
+
+function checkMerge() {
+    if (merged) return false;
+
+    const remaining = [...tribes.A, ...tribes.B];
+
+    if (!merged &&
+        remaining.length <= mergeAt &&
+        episode >= minMergeEpisode) {
+
+        merged = true;
+        tribes.Merged = remaining;
+        tribes.A = [];
+        tribes.B = [];
+        return true;
+    }
+
+    return false;
+}
+
+/* MAIN EPISODE LOOP */
+
 function runEpisode() {
     let html = `<h3>Episode ${episode}</h3>`;
 
@@ -310,13 +409,21 @@ function runEpisode() {
 
     const remaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
 
+    // If final 3, run finale instead of normal episode
+    if (remaining.length === 3) {
+        runFinale(remaining);
+        return;
+    }
+
     // MERGE CHECK
     if (checkMerge()) {
         html += `<h2>Merge!</h2>`;
         html += `<p>The tribes merge into one group.</p>`;
     }
 
-    // IMMUNITY (now challenge-based)
+    const currentRemaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
+
+    // IMMUNITY (challenge-based)
     let immune = null;
     let losingTribe = null;
     let challenge = getRandomChallenge(merged ? "merge" : "tribe");
@@ -343,9 +450,9 @@ function runEpisode() {
         }
     } else {
         if (!challenge) {
-            immune = remaining[Math.floor(Math.random() * remaining.length)];
+            immune = currentRemaining[Math.floor(Math.random() * currentRemaining.length)];
         } else {
-            let scores = remaining.map(p => ({
+            let scores = currentRemaining.map(p => ({
                 player: p,
                 score: computePlayerScore(p, challenge.weights)
             }));
@@ -370,27 +477,27 @@ function runEpisode() {
         html += `<p>${runEvent(tribes.A)}</p>`;
         html += `<p>${runEvent(tribes.B)}</p>`;
     } else {
-        html += `<p>${runEvent(remaining)}</p>`;
-        html += `<p>${runEvent(remaining)}</p>`;
+        html += `<p>${runEvent(currentRemaining)}</p>`;
+        html += `<p>${runEvent(currentRemaining)}</p>`;
     }
 
     // TRIBAL COUNCIL
     html += `<h4>Tribal Council</h4>`;
 
-    let voters = merged ? remaining : tribes[losingTribe];
+    let voters = merged ? currentRemaining : tribes[losingTribe];
     let eliminated;
 
     if (voters.length === 1) {
         eliminated = voters[0];
         html += showImages([eliminated]) +
             `<p>${eliminated} is automatically eliminated.</p>`;
-        stats[eliminated].placement = remaining.length;
+        stats[eliminated].placement = currentRemaining.length;
         stats[eliminated].eliminatedEpisode = episode;
 
         if (merged) tribes.Merged = [];
         else tribes[losingTribe] = [];
     } else {
-        // FIRST VOTE (stat-influenced)
+        // FIRST VOTE (stat + relationship influenced)
         let votes = {};
         voters.forEach(voter => {
             let choices = voters.filter(p => p !== voter && p !== immune);
@@ -497,8 +604,14 @@ function runEpisode() {
         }
 
         stats[eliminated].votesReceived += (tally[eliminated] || 0);
-        stats[eliminated].placement = remaining.length;
+        stats[eliminated].placement = currentRemaining.length;
         stats[eliminated].eliminatedEpisode = episode;
+
+        // If eliminated during merge phase, add to jury
+        const wasMerged = merged || tribes.Merged.includes(eliminated);
+        if (wasMerged) {
+            jury.push(eliminated);
+        }
 
         if (merged) {
             tribes.Merged = voters.filter(p => p !== eliminated);
@@ -508,7 +621,7 @@ function runEpisode() {
 
         let epData = { phase: merged ? "Merge" : "Pre-Merge", results: {} };
 
-        remaining.forEach(p => {
+        currentRemaining.forEach(p => {
             if (p === eliminated) {
                 epData.results[p] = "OUT";
             } else if (p === immune) {
@@ -531,24 +644,11 @@ function runEpisode() {
         episodeResults.push(epData);
     }
 
-    const finalRemaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
-    if (finalRemaining.length === 1) {
-        const winner = finalRemaining[0];
-        stats[winner].placement = 1;
-        stats[winner].eliminatedEpisode = null;
-
-        html += showImages([winner]) + `<h2>${winner} wins Survivor!</h2>`;
-        setLog(html);
-
-        showTrackRecord();
-
-        document.getElementById("nextEpisodeBtn").disabled = true;
-        return;
-    }
-
     setLog(html);
     episode++;
 }
+
+/* SETUP + BUTTONS */
 
 document.getElementById("startBtn").onclick = () => {
     const input = document.getElementById("castInput").value.trim();
@@ -562,6 +662,7 @@ document.getElementById("startBtn").onclick = () => {
     episodeResults = [];
     relationships = {};
     stats = {};
+    jury = [];
 
     lines.forEach(line => {
         let parts = line.split(",");
