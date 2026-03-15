@@ -1,3 +1,7 @@
+/* ============================================================
+   GLOBALS
+   ============================================================ */
+
 let cast = [];
 let tribes = { A: [], B: [], Merged: [] };
 let episode = 1;
@@ -17,6 +21,10 @@ let finaleSize = null;
 let finaleFinalists = [];
 let finaleWinner = null;
 
+/* ============================================================
+   BASIC HELPERS
+   ============================================================ */
+
 function setLog(html) {
     document.getElementById("log").innerHTML = html;
 }
@@ -24,6 +32,22 @@ function setLog(html) {
 function shuffle(arr) {
     return arr.sort(() => Math.random() - 0.5);
 }
+
+function showImage(player) {
+    const src = photos[player] || "https://via.placeholder.com/80?text=No+Image";
+    return `<img class="contestant-photo" src="${src}" alt="${player}">`;
+}
+
+function showImages(playersArray) {
+    if (!playersArray || playersArray.length === 0) return "";
+    return `<div class="icon-grid">` +
+        playersArray.map(p => showImage(p)).join("") +
+        `</div>`;
+}
+
+/* ============================================================
+   RELATIONSHIPS + STATS
+   ============================================================ */
 
 function initRelationships(players) {
     players.forEach(p => {
@@ -36,11 +60,10 @@ function initRelationships(players) {
     });
 }
 
-// 1–5 stats, default 3 (we’ll add a stat editor later)
+// 1–5 stats, default 3 (stat editor coming soon)
 function initStats(players) {
     players.forEach(p => {
         stats[p] = {
-            // GAME STATS
             tribeHistory: [],
             immunityWins: 0,
             votesReceived: 0,
@@ -48,7 +71,6 @@ function initStats(players) {
             placement: null,
             eliminatedEpisode: null,
 
-            // PERFORMANCE STATS (editable later, default 3)
             physical: 3,
             endurance: 3,
             mental: 3,
@@ -58,7 +80,6 @@ function initStats(players) {
             strategy: 3,
             loyalty: 3,
 
-            // Finale/jury helper
             votedForWinner: null
         };
     });
@@ -77,6 +98,10 @@ function adjustRelationship(a, b, amount) {
     relationships[b][a] = Math.max(0, Math.min(100, relationships[b][a] + amount));
 }
 
+/* ============================================================
+   TRIBE ASSIGNMENT
+   ============================================================ */
+
 function assignTribes() {
     const shuffled = shuffle([...cast]);
     const half = Math.ceil(shuffled.length / 2);
@@ -84,19 +109,10 @@ function assignTribes() {
     tribes.B = shuffled.slice(half);
 }
 
-function showImage(player) {
-    const src = photos[player] || "https://via.placeholder.com/80?text=No+Image";
-    return `<img class="contestant-photo" src="${src}" alt="${player}">`;
-}
+/* ============================================================
+   EVENTS (from events.js)
+   ============================================================ */
 
-function showImages(playersArray) {
-    if (!playersArray || playersArray.length === 0) return "";
-    return `<div class="icon-grid">` +
-        playersArray.map(p => showImage(p)).join("") +
-        `</div>`;
-}
-
-/* EVENTS (from events.js) */
 function runEvent(tribe) {
     const size = tribe.length;
 
@@ -124,7 +140,9 @@ function runEvent(tribe) {
     return showImages(chosenPlayers) + event.text(chosenPlayers);
 }
 
-/* CHALLENGES (from challenges.js) */
+/* ============================================================
+   CHALLENGES (from challenges.js)
+   ============================================================ */
 
 function getRandomChallenge(type) {
     const pool = CHALLENGES.filter(c => c.type === type);
@@ -139,7 +157,6 @@ function computePlayerScore(player, weights) {
             score += stats[player][key] * weights[key];
         }
     }
-    // small luck influence
     score += stats[player].luck * 0.2;
     return score;
 }
@@ -153,14 +170,18 @@ function computeTribeScore(tribePlayers, weights) {
     return total / tribePlayers.length;
 }
 
-/* TIEBREAKERS (from tiebreakers.js) */
+/* ============================================================
+   TIEBREAKERS (from tiebreakers.js)
+   ============================================================ */
 
 function getRandomTiebreaker() {
     if (!TIEBREAKERS || TIEBREAKERS.length === 0) return null;
     return TIEBREAKERS[Math.floor(Math.random() * TIEBREAKERS.length)];
 }
 
-/* TRACK RECORD WITH FINAL COLUMN */
+/* ============================================================
+   TRACK RECORD (with finale column)
+   ============================================================ */
 
 function showTrackRecord() {
     let html = `<h2>Season Track Record</h2>`;
@@ -169,7 +190,7 @@ function showTrackRecord() {
 
     html += `<table border="1" cellpadding="6" style="margin:auto; border-collapse:collapse;">`;
 
-    // HEADER ROW 1
+    /* HEADER ROW 1 */
     html += `<tr>
                 <th rowspan="2">Rank</th>
                 <th rowspan="2">Contestant</th>
@@ -179,11 +200,11 @@ function showTrackRecord() {
         html += `<th>Ep. ${i}</th>`;
     }
 
-    // Final column header
-    html += `<th>Final</th>`;
+    // Finale column header uses episode number
+    html += `<th>Ep. ${episode}</th>`;
     html += `</tr>`;
 
-    // HEADER ROW 2 (PHASE CELLS)
+    /* HEADER ROW 2 (PHASE CELLS) */
     html += `<tr>`;
 
     let i = 0;
@@ -202,11 +223,11 @@ function showTrackRecord() {
         i += span;
     }
 
-    // Final column phase cell
+    // Finale phase cell
     html += `<td style="background:#ddd; font-weight:bold;">Final</td>`;
     html += `</tr>`;
 
-    // BODY ROWS
+    /* BODY ROWS */
     const sortedPlayers = Object.keys(stats).sort((a, b) => stats[a].placement - stats[b].placement);
 
     let runnerUps = [];
@@ -217,12 +238,11 @@ function showTrackRecord() {
 
     sortedPlayers.forEach(player => {
         const placement = stats[player].placement;
-
-        // Handle shared 2nd place in Final 3 (placement cell spans both rows)
         const isRunnerUp = runnerUps.includes(player) && runnerUps.length === 2;
 
         html += `<tr>`;
 
+        /* Placement cell with rowspan for Final 3 */
         if (placement === 2 && isRunnerUp) {
             if (!printedSecondPlace) {
                 html += `<td rowspan="2">2</td>`;
@@ -237,6 +257,7 @@ function showTrackRecord() {
 
         const eliminatedEp = stats[player].eliminatedEpisode;
 
+        /* Episode cells */
         episodeResults.forEach((ep, index) => {
             const epNum = index + 1;
 
@@ -251,22 +272,9 @@ function showTrackRecord() {
             let color = "black";
 
             if (result === "OUT") bg = "#ff9999";
-
-            if (result === "IMM") {
-                if (ep.phase === "Pre-Merge") {
-                    bg = "#55cc55";
-                } else {
-                    bg = "#99ff99";
-                }
-            }
-
+            if (result === "IMM") bg = ep.phase === "Pre-Merge" ? "#55cc55" : "#99ff99";
             if (result === "SAFE") bg = "white";
-
-            if (result === "TIE") {
-                bg = "#ffbb66";
-                color = "black";
-            }
-
+            if (result === "TIE") bg = "#ffbb66";
             if (result === "TIEBRK") {
                 bg = "#cc5500";
                 color = "white";
@@ -276,7 +284,7 @@ function showTrackRecord() {
             html += `<td style="background:${bg}; color:${color};">${result}</td>`;
         });
 
-        // FINAL COLUMN
+        /* FINAL COLUMN */
         if (jury.includes(player)) {
             const votedFor = stats[player].votedForWinner || "—";
             html += `<td style="background:#e6e6e6; color:black; text-align:center;">
@@ -285,12 +293,13 @@ function showTrackRecord() {
                      </td>`;
         } else if (finaleFinalists.includes(player)) {
             if (player === finaleWinner) {
-                html += `<td style="background:#ffd700; font-weight:bold; text-align:center;">WINNER!</td>`;
+                html += `<td style="background:#ffd700; font-weight:bold; text-align:center;">WINNER</td>`;
             } else {
                 html += `<td style="background:#c0c0c0; font-weight:bold; text-align:center;">RUNNER-UP</td>`;
             }
         } else {
-            html += `<td></td>`;
+            // Non-jurors get blank grey (#dddddd)
+            html += `<td style="background:#dddddd;"></td>`;
         }
 
         html += `</tr>`;
@@ -301,7 +310,9 @@ function showTrackRecord() {
     document.getElementById("log").innerHTML += html;
 }
 
-/* JURY VOTING (relationships only) */
+/* ============================================================
+   JURY VOTING
+   ============================================================ */
 
 function juryVote(juror, finalists) {
     let best = finalists[0];
@@ -318,7 +329,9 @@ function juryVote(juror, finalists) {
     return best;
 }
 
-/* FINALE: FINAL 2 or FINAL 3 + JURY */
+/* ============================================================
+   FINALE (Final 2 or Final 3)
+   ============================================================ */
 
 function runFinale(finalists) {
     finaleFinalists = [...finalists];
@@ -329,20 +342,16 @@ function runFinale(finalists) {
     html += `<p>The finalists face the jury.</p>`;
 
     if (jury.length === 0) {
-        html += `<p>No jury exists. The simulator will randomly pick a winner.</p>`;
+        html += `<p>No jury exists. A random winner is chosen.</p>`;
         const winner = finalists[Math.floor(Math.random() * finalists.length)];
         finaleWinner = winner;
-        stats[winner].placement = 1;
-        stats[winner].eliminatedEpisode = null;
 
+        stats[winner].placement = 1;
         finalists.forEach(p => {
-            if (p !== winner) {
-                stats[p].placement = 2;
-                stats[p].eliminatedEpisode = episode;
-            }
+            if (p !== winner) stats[p].placement = 2;
         });
 
-        html += showImages([winner]) + `<h2>${winner} wins Survivor!</h2>`;
+        html += showImages([winner]) + `<h2>${winner} wins Survivor</h2>`;
         setLog(html);
         showTrackRecord();
         document.getElementById("nextEpisodeBtn").disabled = true;
@@ -360,7 +369,7 @@ function runFinale(finalists) {
         stats[juror].votedForWinner = voteFor;
 
         html += showImages([juror, voteFor]) +
-            `<p>${juror} votes for ${voteFor} to win.</p>`;
+            `<p>${juror} votes for ${voteFor}.</p>`;
     });
 
     let maxVotes = Math.max(...Object.values(voteTally));
@@ -371,30 +380,15 @@ function runFinale(finalists) {
         winner = winners[0];
     } else {
         winner = winners[Math.floor(Math.random() * winners.length)];
-        html += `<p>The jury vote is tied. By random draw, ${winner} wins.</p>`;
+        html += `<p>The jury is tied. By random draw, ${winner} wins.</p>`;
     }
 
     finaleWinner = winner;
 
-    // placements
     stats[winner].placement = 1;
-    stats[winner].eliminatedEpisode = null;
-
-    if (finalists.length === 2) {
-        finalists.forEach(p => {
-            if (p !== winner) {
-                stats[p].placement = 2;
-                stats[p].eliminatedEpisode = episode;
-            }
-        });
-    } else if (finalists.length === 3) {
-        finalists.forEach(p => {
-            if (p !== winner) {
-                stats[p].placement = 2;
-                stats[p].eliminatedEpisode = episode;
-            }
-        });
-    }
+    finalists.forEach(p => {
+        if (p !== winner) stats[p].placement = 2;
+    });
 
     html += `<h4>Final Vote Tally</h4><ul>`;
     finalists.forEach(f => {
@@ -402,14 +396,16 @@ function runFinale(finalists) {
     });
     html += `</ul>`;
 
-    html += showImages([winner]) + `<h2>${winner} wins Survivor!</h2>`;
+    html += showImages([winner]) + `<h2>${winner} wins Survivor</h2>`;
 
     setLog(html);
     showTrackRecord();
     document.getElementById("nextEpisodeBtn").disabled = true;
 }
 
-/* TIEBREAKER SYSTEM (stat-based) */
+/* ============================================================
+   TIEBREAKERS
+   ============================================================ */
 
 function runRandomCompetitionTiebreaker(tiedPlayers) {
     const tb = getRandomTiebreaker();
@@ -419,12 +415,12 @@ function runRandomCompetitionTiebreaker(tiedPlayers) {
         const loser = tiedPlayers[Math.floor(Math.random() * tiedPlayers.length)];
         html += showImages(tiedPlayers);
         html += `<p><strong>Tiebreaker:</strong> Random draw.</p>`;
-        html += `<p>${loser} loses the tiebreaker and is eliminated.</p>`;
+        html += `<p>${loser} loses the tiebreaker.</p>`;
         return { eliminated: loser, log: html };
     }
 
     html += showImages(tiedPlayers);
-    html += `<p><strong>Tiebreaker Competition:</strong> ${tb.name}</p>`;
+    html += `<p><strong>Tiebreaker:</strong> ${tb.name}</p>`;
     html += `<p>${tb.description}</p>`;
 
     let scores = tiedPlayers.map(p => ({
@@ -439,12 +435,14 @@ function runRandomCompetitionTiebreaker(tiedPlayers) {
 
     const loser = lowestPlayers[Math.floor(Math.random() * lowestPlayers.length)];
 
-    html += `<p>${loser} performs the worst in the tiebreaker and is eliminated.</p>`;
+    html += `<p>${loser} performs the worst and is eliminated.</p>`;
 
     return { eliminated: loser, log: html };
 }
 
-/* MERGE CHECK */
+/* ============================================================
+   MERGE CHECK
+   ============================================================ */
 
 function checkMerge() {
     if (merged) return false;
@@ -465,7 +463,9 @@ function checkMerge() {
     return false;
 }
 
-/* MAIN EPISODE LOOP */
+/* ============================================================
+   MAIN EPISODE LOOP
+   ============================================================ */
 
 function runEpisode() {
     let html = `<h3>Episode ${episode}</h3>`;
@@ -474,7 +474,7 @@ function runEpisode() {
 
     const remaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
 
-    // Decide finale size once (random Final 2 or Final 3)
+    // Randomly choose Final 2 or Final 3 once
     if (!finaleSize) {
         finaleSize = Math.random() < 0.5 ? 2 : 3;
     }
@@ -493,31 +493,26 @@ function runEpisode() {
 
     const currentRemaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
 
-    // IMMUNITY (challenge-based)
+    /* IMMUNITY CHALLENGE */
     let immune = null;
     let losingTribe = null;
     let challenge = getRandomChallenge(merged ? "merge" : "tribe");
 
     if (!merged) {
-        if (!challenge) {
-            const winning = Math.random() < 0.5 ? "A" : "B";
-            losingTribe = winning === "A" ? "B" : "A";
-            const winningTribeMembers = winning === "A" ? tribes.A : tribes.B;
-            html += showImages(winningTribeMembers) +
-                `<p><strong>Immunity Challenge:</strong> Tribe ${winning} wins immunity!</p>`;
-        } else {
-            const tribeAScore = computeTribeScore(tribes.A, challenge.weights);
-            const tribeBScore = computeTribeScore(tribes.B, challenge.weights);
+        const tribeAScore = challenge ? computeTribeScore(tribes.A, challenge.weights) : Math.random();
+        const tribeBScore = challenge ? computeTribeScore(tribes.B, challenge.weights) : Math.random();
 
-            const winning = tribeAScore > tribeBScore ? "A" : "B";
-            losingTribe = winning === "A" ? "B" : "A";
-            const winningTribeMembers = winning === "A" ? tribes.A : tribes.B;
+        const winning = tribeAScore > tribeBScore ? "A" : "B";
+        losingTribe = winning === "A" ? "B" : "A";
+        const winningMembers = winning === "A" ? tribes.A : tribes.B;
 
+        if (challenge) {
             html += `<p><strong>Immunity Challenge:</strong> ${challenge.name}</p>`;
             html += `<p>${challenge.description}</p>`;
-            html += showImages(winningTribeMembers) +
-                `<p>Tribe ${winning} wins immunity!</p>`;
         }
+
+        html += showImages(winningMembers) +
+            `<p>Tribe ${winning} wins immunity.</p>`;
     } else {
         if (!challenge) {
             immune = currentRemaining[Math.floor(Math.random() * currentRemaining.length)];
@@ -538,10 +533,11 @@ function runEpisode() {
 
         stats[immune].immunityWins++;
         html += showImages([immune]) +
-            `<p><strong>Individual Immunity:</strong> ${immune} wins immunity!</p>`;
+            `<p><strong>Individual Immunity:</strong> ${immune} wins immunity.</p    html += showImages([immune]) +
+        `<p><strong>Individual Immunity:</strong> ${immune} wins immunity.</p>`;
     }
 
-    // EVENTS
+    /* EVENTS */
     html += `<h4>Post-Challenge Events</h4>`;
     if (!merged) {
         html += `<p>${runEvent(tribes.A)}</p>`;
@@ -551,7 +547,7 @@ function runEpisode() {
         html += `<p>${runEvent(currentRemaining)}</p>`;
     }
 
-    // TRIBAL COUNCIL
+    /* TRIBAL COUNCIL */
     html += `<h4>Tribal Council</h4>`;
 
     let voters = merged ? currentRemaining : tribes[losingTribe];
@@ -567,7 +563,7 @@ function runEpisode() {
         if (merged) tribes.Merged = [];
         else tribes[losingTribe] = [];
     } else {
-        // FIRST VOTE (stat + relationship influenced)
+        /* FIRST VOTE */
         let votes = {};
         voters.forEach(voter => {
             let choices = voters.filter(p => p !== voter && p !== immune);
@@ -615,7 +611,7 @@ function runEpisode() {
             html += showImages([eliminated]) +
                 `<p><strong>${eliminated} is voted out.</strong></p>`;
         } else {
-            // TIE → REVOTE
+            /* REVOTE */
             html += `<p><strong>The vote is tied between ${tied.join(", ")}. They will revote.</strong></p>`;
 
             let revoteVotes = {};
@@ -677,7 +673,7 @@ function runEpisode() {
         stats[eliminated].placement = currentRemaining.length;
         stats[eliminated].eliminatedEpisode = episode;
 
-        // If eliminated during merge phase, add to jury
+        /* Add to jury if merge phase */
         const wasMerged = merged || tribes.Merged.includes(eliminated);
         if (wasMerged) {
             jury.push(eliminated);
@@ -689,6 +685,7 @@ function runEpisode() {
             tribes[losingTribe] = voters.filter(p => p !== eliminated);
         }
 
+        /* EPISODE RESULT LOGGING */
         let epData = { phase: merged ? "Merge" : "Pre-Merge", results: {} };
 
         currentRemaining.forEach(p => {
@@ -718,7 +715,9 @@ function runEpisode() {
     episode++;
 }
 
-/* SETUP + BUTTONS */
+/* ============================================================
+   SETUP + BUTTONS
+   ============================================================ */
 
 document.getElementById("startBtn").onclick = () => {
     const input = document.getElementById("castInput").value.trim();
