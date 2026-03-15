@@ -7,9 +7,10 @@ let merged = false;
 let mergeAt = Math.floor(Math.random() * 4) + 8; // 8–11 players
 let minMergeEpisode = 4 + Math.floor(Math.random() * 2); // episode 4 or 5
 
-// RELATIONSHIPS + STATS
+// RELATIONSHIPS + STATS + EPISODE RESULTS
 let relationships = {};
 let stats = {};
+let episodeResults = [];
 
 function setLog(html) {
     document.getElementById("log").innerHTML = html;
@@ -106,17 +107,44 @@ function checkMerge() {
 function showTrackRecord() {
     let html = `<h2>Season Track Record</h2>`;
 
-    Object.entries(stats).forEach(([player, s]) => {
-        html += `
-            <div style="margin-bottom:20px;">
-                <h3>${player} — Placement: ${s.placement}</h3>
-                <p><strong>Tribes:</strong> ${s.tribeHistory.join(", ")}</p>
-                <p><strong>Immunity Wins:</strong> ${s.immunityWins}</p>
-                <p><strong>Votes Received:</strong> ${s.votesReceived}</p>
-                <p><strong>Votes Cast:</strong> ${s.votesCast.join(", ")}</p>
-            </div>
-        `;
+    const totalEpisodes = episodeResults.length;
+
+    html += `<table border="1" cellpadding="6" style="margin:auto; border-collapse:collapse;">`;
+
+    // HEADER ROW 1
+    html += `<tr>
+                <th rowspan="2">Rank</th>
+                <th rowspan="2">Contestant</th>`;
+
+    for (let i = 1; i <= totalEpisodes; i++) {
+        html += `<th>Ep. ${i}</th>`;
+    }
+
+    html += `</tr>`;
+
+    // HEADER ROW 2 (PHASES)
+    html += `<tr>`;
+    episodeResults.forEach(ep => {
+        html += `<td>${ep.phase}</td>`;
     });
+    html += `</tr>`;
+
+    // BODY ROWS (CONTESTANTS)
+    const sortedPlayers = Object.keys(stats).sort((a, b) => stats[a].placement - stats[b].placement);
+
+    sortedPlayers.forEach(player => {
+        html += `<tr>
+                    <td>${stats[player].placement}</td>
+                    <td>${player}</td>`;
+
+        episodeResults.forEach(ep => {
+            html += `<td>${ep.results[player] || ""}</td>`;
+        });
+
+        html += `</tr>`;
+    });
+
+    html += `</table>`;
 
     document.getElementById("log").innerHTML += html;
 }
@@ -162,9 +190,10 @@ function runEpisode() {
     html += `<h4>Tribal Council</h4>`;
 
     let voters = merged ? remaining : tribes[losingTribe];
+    let eliminated;
 
     if (voters.length === 1) {
-        const eliminated = voters[0];
+        eliminated = voters[0];
         html += `<p>${eliminated} is automatically eliminated.</p>`;
         stats[eliminated].placement = remaining.length;
 
@@ -190,7 +219,7 @@ function runEpisode() {
             tally[target] = (tally[target] || 0) + 1;
         });
 
-        const eliminated = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
+        eliminated = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
         html += `<p><strong>${eliminated} is voted out.</strong></p>`;
 
         stats[eliminated].votesReceived += tally[eliminated];
@@ -202,6 +231,18 @@ function runEpisode() {
             tribes[losingTribe] = voters.filter(p => p !== eliminated);
         }
     }
+
+    // RECORD EPISODE RESULTS
+    let epData = { phase: merged ? "Merge" : "Pre-Merge", results: {} };
+
+    remaining.forEach(p => {
+        if (p === immune) epData.results[p] = "IMM";
+        else epData.results[p] = "SAFE";
+    });
+
+    if (eliminated) epData.results[eliminated] = "OUT";
+
+    episodeResults.push(epData);
 
     // WINNER CHECK
     const finalRemaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
