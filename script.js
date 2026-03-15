@@ -102,6 +102,8 @@ function randomEvent(tribe) {
 }
 
 function checkMerge() {
+    if (merged) return false; // Already merged from start
+
     const remaining = [...tribes.A, ...tribes.B];
 
     if (!merged &&
@@ -332,18 +334,34 @@ document.getElementById("startBtn").onclick = () => {
         }
     });
 
-    assignTribes();
+    // AUTO-MERGE MODE
+    if (cast.length < 4) {
+        merged = true;
+        tribes.A = [];
+        tribes.B = [];
+        tribes.Merged = [...cast];
+    } else {
+        assignTribes();
+    }
+
     initRelationships(cast);
     initStats(cast);
 
     document.getElementById("setup").style.display = "none";
     document.getElementById("game").style.display = "block";
 
-    setLog(`
-        <h3>Season Begins!</h3>
-        <p><strong>Tribe A:</strong> ${tribes.A.join(", ")}</p>
-        <p><strong>Tribe B:</strong> ${tribes.B.join(", ")}</p>
-    `);
+    if (merged) {
+        setLog(`
+            <h3>Season Begins!</h3>
+            <p>The game begins at the <strong>Merge</strong> due to a small cast.</p>
+        `);
+    } else {
+        setLog(`
+            <h3>Season Begins!</h3>
+            <p><strong>Tribe A:</strong> ${tribes.A.join(", ")}</p>
+            <p><strong>Tribe B:</strong> ${tribes.B.join(", ")}</p>
+        `);
+    }
 };
 
 document.getElementById("nextEpisodeBtn").onclick = runEpisode;
