@@ -172,15 +172,20 @@ function showTrackRecord() {
         episodeResults.forEach(ep => {
             let result = ep.results[player] || "";
 
-            let bg = "#dddddd";
+            let bg = "white";
+            let color = "black";
+
             if (result === "OUT") bg = "#ff9999";
             if (result === "IMM") bg = "#99ff99";
-            if (result === "TIMM") bg = "#66cc66";
             if (result === "SAFE") bg = "white";
 
-            let display = result === "TIMM" ? "IMM" : result;
+            if (result === "TIE") bg = "#ffddaa";
+            if (result === "TIEBRK") {
+                bg = "#ff8800";
+                color = "white";
+            }
 
-            html += `<td style="background:${bg};">${display}</td>`;
+            html += `<td style="background:${bg}; color:${color};">${result}</td>`;
         });
 
         html += `</tr>`;
@@ -296,8 +301,10 @@ function runEpisode() {
         let maxVotes = Math.max(...Object.values(tally));
         let tied = Object.keys(tally).filter(p => tally[p] === maxVotes);
 
+        let tiedPlayersFirstVote = [...tied];
+        let tiedPlayersDeadlock = [];
+
         if (tied.length === 1) {
-            // Clear loser
             eliminated = tied[0];
             html += showImages([eliminated]) +
                 `<p><strong>${eliminated} is voted out.</strong></p>`;
@@ -329,8 +336,9 @@ function runEpisode() {
             let revoteMax = Math.max(...Object.values(revoteTally));
             let revoteTied = Object.keys(revoteTally).filter(p => revoteTally[p] === revoteMax);
 
+            tiedPlayersDeadlock = [...revoteTied];
+
             if (revoteTied.length === 1) {
-                // Revote breaks tie
                 eliminated = revoteTied[0];
                 html += showImages([eliminated]) +
                     `<p><strong>${eliminated} is voted out after the revote.</strong></p>`;
@@ -344,7 +352,6 @@ function runEpisode() {
         }
 
         stats[eliminated].votesReceived += (tally[eliminated] || 0);
-
         stats[eliminated].placement = remaining.length;
 
         if (merged) {
@@ -352,24 +359,32 @@ function runEpisode() {
         } else {
             tribes[losingTribe] = voters.filter(p => p !== eliminated);
         }
+
+        // RECORD EPISODE RESULTS
+        let epData = { phase: merged ? "Merge" : "Pre-Merge", results: {} };
+
+        remaining.forEach(p => {
+            if (p === eliminated) {
+                epData.results[p] = "OUT";
+            } else if (p === immune) {
+                epData.results[p] = "IMM";
+            } else {
+                epData.results[p] = "SAFE";
+            }
+        });
+
+        // Mark TIE survivors
+        tiedPlayersFirstVote.forEach(p => {
+            if (p !== eliminated) epData.results[p] = "TIE";
+        });
+
+        // Mark TIEBRK survivors
+        tiedPlayersDeadlock.forEach(p => {
+            if (p !== eliminated) epData.results[p] = "TIEBRK";
+        });
+
+        episodeResults.push(epData);
     }
-
-    // RECORD EPISODE RESULTS
-    let epData = { phase: merged ? "Merge" : "Pre-Merge", results: {} };
-
-    remaining.forEach(p => {
-        if (p === eliminated) {
-            epData.results[p] = "OUT";
-        } else if (p === immune) {
-            epData.results[p] = "IMM";
-        } else if (!merged && tribes[losingTribe] && !tribes[losingTribe].includes(p)) {
-            epData.results[p] = "TIMM";
-        } else {
-            epData.results[p] = "SAFE";
-        }
-    });
-
-    episodeResults.push(epData);
 
     // WINNER CHECK
     const finalRemaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
