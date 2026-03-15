@@ -16,20 +16,31 @@ img.contestant-photo {
     border-radius: 4px;
 }
 
+/* Multi-person icon grid */
 .icon-grid {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 4px;
+    gap: 6px;
+
+    width: 100%;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
     margin-bottom: 6px;
 }
 
-#log img.contestant-photo {
-    display: block;
+/* Outline ONLY in episode log + events */
+#log img.contestant-photo,
+.icon-grid img.contestant-photo {
+    outline: 2px solid rgba(0,0,0,0.15);
+    outline-offset: 2px;
 }
 
+/* Track record icons have NO outline */
 table img.contestant-photo {
-    display: block;
+    outline: none !important;
     margin-left: auto;
     margin-right: auto;
 }
+
