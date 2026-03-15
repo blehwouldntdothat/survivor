@@ -2,9 +2,9 @@ let cast = [];
 let tribes = { A: [], B: [] };
 let episode = 1;
 
-function log(text) {
+function setLog(text) {
     const logDiv = document.getElementById("log");
-    logDiv.innerHTML += `<p>${text}</p>`;
+    logDiv.innerHTML = text; // replaces instead of appending
 }
 
 function shuffle(array) {
@@ -18,30 +18,91 @@ function assignTribes() {
     tribes.B = shuffled.slice(half);
 }
 
+function randomEvent(tribeMembers) {
+    if (tribeMembers.length < 2) {
+        return `${tribeMembers[0]} spends the day alone.`;
+    }
+
+    const p1 = tribeMembers[Math.floor(Math.random() * tribeMembers.length)];
+    let p2 = p1;
+    while (p2 === p1) {
+        p2 = tribeMembers[Math.floor(Math.random() * tribeMembers.length)];
+    }
+
+    const events = [
+        `${p1} and ${p2} bond over camp life.`,
+        `${p1} annoys ${p2} with their attitude.`,
+        `${p1} finds some extra food.`,
+        `${p1} and ${p2} argue about strategy.`,
+        `${p1} takes a nap instead of working.`,
+    ];
+
+    return events[Math.floor(Math.random() * events.length)];
+}
+
 function runEpisode() {
-    log(`<strong>Episode ${episode}</strong>`);
+    let logText = `<h3>Episode ${episode}</h3>`;
 
     // 1. Immunity
     const winningTribe = Math.random() < 0.5 ? "A" : "B";
     const losingTribe = winningTribe === "A" ? "B" : "A";
-    log(`Tribe ${winningTribe} wins immunity!`);
 
-    // 2. Tribal Council
+    logText += `<p><strong>Immunity Challenge:</strong> Tribe ${winningTribe} wins immunity!</p>`;
+
+    // 2. Post-challenge events
+    logText += `<h4>Post-Challenge Events</h4>`;
+    logText += `<p>${randomEvent(tribes.A)}</p>`;
+    logText += `<p>${randomEvent(tribes.B)}</p>`;
+
+    // 3. Tribal Council
     const tribeMembers = tribes[losingTribe];
-    const votedOut = tribeMembers[Math.floor(Math.random() * tribeMembers.length)];
-    log(`Tribe ${losingTribe} goes to Tribal Council.`);
-    log(`${votedOut} is voted out.`);
 
-    // Remove from tribe
-    tribes[losingTribe] = tribeMembers.filter(p => p !== votedOut);
+    logText += `<h4>Tribal Council (${losingTribe})</h4>`;
 
-    // 3. Check for winner
+    if (tribeMembers.length === 1) {
+        // Auto-eliminate
+        const eliminated = tribeMembers[0];
+        logText += `<p>${eliminated} is automatically eliminated.</p>`;
+        tribes[losingTribe] = [];
+    } else {
+        // Voting
+        let votes = {};
+        tribeMembers.forEach(voter => {
+            let voteFor = voter;
+            while (voteFor === voter) {
+                voteFor = tribeMembers[Math.floor(Math.random() * tribeMembers.length)];
+            }
+            votes[voter] = voteFor;
+        });
+
+        // Display votes
+        logText += `<p><strong>Votes:</strong></p>`;
+        Object.entries(votes).forEach(([voter, target]) => {
+            logText += `<p>${voter} voted for ${target}</p>`;
+        });
+
+        // Count votes
+        let tally = {};
+        Object.values(votes).forEach(target => {
+            tally[target] = (tally[target] || 0) + 1;
+        });
+
+        // Find highest vote-getter
+        let eliminated = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
+        logText += `<p><strong>${eliminated} is voted out.</strong></p>`;
+
+        // Remove from tribe
+        tribes[losingTribe] = tribeMembers.filter(p => p !== eliminated);
+    }
+
+    // 4. Check for winner
     const remaining = [...tribes.A, ...tribes.B];
     if (remaining.length === 1) {
-        log(`<strong>${remaining[0]} wins Survivor!</strong>`);
+        logText += `<h2>${remaining[0]} wins Survivor!</h2>`;
         document.getElementById("nextEpisodeBtn").disabled = true;
     }
 
+    setLog(logText);
     episode++;
 }
 
@@ -59,9 +120,11 @@ document.getElementById("startBtn").onclick = () => {
     document.getElementById("setup").style.display = "none";
     document.getElementById("game").style.display = "block";
 
-    log("Season begins!");
-    log(`Tribe A: ${tribes.A.join(", ")}`);
-    log(`Tribe B: ${tribes.B.join(", ")}`);
+    setLog(`
+        <h3>Season Begins!</h3>
+        <p><strong>Tribe A:</strong> ${tribes.A.join(", ")}</p>
+        <p><strong>Tribe B:</strong> ${tribes.B.join(", ")}</p>
+    `);
 };
 
 document.getElementById("nextEpisodeBtn").onclick = runEpisode;
