@@ -1,46 +1,137 @@
 body {
     font-family: Arial, sans-serif;
-    background: #f3f3f3;
-    padding: 20px;
-
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     text-align: center;
+    background: #fafafa;
+    margin: 0;
+    padding: 20px;
 }
 
-img.contestant-photo {
-    width: 80px;
-    height: 80px;
+h1 {
+    margin-bottom: 10px;
+}
+
+#addContestantForm input {
+    padding: 6px;
+    margin: 4px;
+}
+
+#addContestantForm button {
+    padding: 6px 12px;
+}
+
+#castList {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin: 15px auto;
+    max-width: 800px;
+}
+
+.castCard {
+    background: white;
+    border: 1px solid #ccc;
+    padding: 8px;
+    width: 150px;
+    border-radius: 6px;
+}
+
+.castCard img {
+    width: 100%;
+    height: 120px;
     object-fit: cover;
     border-radius: 4px;
 }
 
-/* Multi-person icon grid */
+.castCard button {
+    margin-top: 6px;
+    padding: 4px 8px;
+}
+
+#menuButtons {
+    margin-top: 20px;
+}
+
+#menuButtons button {
+    padding: 10px 20px;
+    margin: 5px;
+    font-size: 16px;
+}
+
+/* ============================
+   STAT EDITOR
+   ============================ */
+
+#statEditor {
+    max-width: 900px;
+    margin: auto;
+}
+
+.statBlock {
+    background: white;
+    border: 1px solid #ccc;
+    padding: 12px;
+    margin: 15px 0;
+    border-radius: 6px;
+}
+
+.statHeader {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.statHeader img {
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    object-fit: cover;
+}
+
+.statRow {
+    display: flex;
+    justify-content: space-between;
+    margin: 6px 0;
+}
+
+.statRow label {
+    width: 120px;
+    text-align: right;
+    padding-right: 10px;
+}
+
+.statRow select {
+    width: 60px;
+    padding: 4px;
+}
+
+#saveStatsBtn {
+    padding: 12px 20px;
+    font-size: 18px;
+    margin-top: 20px;
+}
+
+/* ============================
+   GAME LOG
+   ============================ */
+
+#log {
+    max-width: 900px;
+    margin: auto;
+    text-align: left;
+}
+
 .icon-grid {
     display: flex;
-    flex-wrap: wrap;
     justify-content: center;
     gap: 6px;
-
-    width: 100%;
-    max-width: 700px;
-    margin-left: auto;
-    margin-right: auto;
-    margin-bottom: 6px;
+    flex-wrap: wrap;
 }
 
-/* Outline ONLY in episode log + events */
-#log img.contestant-photo,
-.icon-grid img.contestant-photo {
-    outline: 2px solid rgba(0,0,0,0.15);
-    outline-offset: 2px;
+.contestant-photo {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
 }
-
-/* Track record icons have NO outline */
-table img.contestant-photo {
-    outline: none !important;
-    margin-left: auto;
-    margin-right: auto;
-}
-
