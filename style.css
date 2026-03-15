@@ -14,13 +14,18 @@ img.contestant-photo {
     height: 80px;
     object-fit: cover;
     border-radius: 4px;
+}
+
+.icon-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
     margin-bottom: 6px;
 }
 
 #log img.contestant-photo {
     display: block;
-    margin-left: auto;
-    margin-right: auto;
 }
 
 table img.contestant-photo {
