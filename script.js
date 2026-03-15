@@ -25,6 +25,45 @@ let finaleWinner = null;
 let finaleSetting = "random";
 
 /* ============================================================
+   RELATIONSHIPS + STATS
+   ============================================================ */
+
+function initRelationships(players) {
+    players.forEach(p => {
+        relationships[p] = {};
+        players.forEach(o => {
+            if (p !== o) {
+                relationships[p][o] = 40 + Math.floor(Math.random() * 20);
+            }
+        });
+    });
+}
+
+function initStats(players) {
+    players.forEach(p => {
+        stats[p] = {
+            tribeHistory: [],
+            immunityWins: 0,
+            votesReceived: 0,
+            votesCast: [],
+            placement: null,
+            eliminatedEpisode: null,
+
+            physical: 3,
+            endurance: 3,
+            mental: 3,
+            social: 3,
+            temperament: 3,
+            luck: 3,
+            strategy: 3,
+            loyalty: 3,
+
+            votedForWinner: null
+        };
+    });
+}
+
+/* ============================================================
    HIDDEN IMMUNITY IDOL SYSTEM (NEW)
    ============================================================ */
 
