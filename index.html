@@ -9,29 +9,55 @@
 
 <h1>Survivor Simulator</h1>
 
-<div id="setup">
+<!-- ============================
+     MAIN MENU
+     ============================ -->
+<div id="mainMenu">
+
     <h2>Cast Setup</h2>
-    <textarea id="castInput" rows="10" cols="40"
-        placeholder="Enter contestants like:
-Ava, https://i.imgur.com/abc123.png
-Liam, https://example.com/liam.jpg
-Noah"></textarea>
-    <br>
-    <button id="startBtn">Start Season</button>
+
+    <div id="addContestantForm">
+        <input type="text" id="newName" placeholder="Name">
+        <input type="text" id="newPhoto" placeholder="Image URL (optional)">
+        <button id="addContestantBtn">Add Contestant</button>
+    </div>
+
+    <h3>Current Cast</h3>
+    <div id="castList"></div>
+
+    <div id="menuButtons">
+        <button id="editStatsBtn">Edit All Stats</button>
+        <button id="startBtn">Start Season</button>
+    </div>
+
 </div>
 
+<!-- ============================
+     STAT EDITOR SCREEN
+     ============================ -->
+<div id="statEditor" style="display:none;">
+    <h2>Edit All Stats</h2>
+
+    <div id="statEditorContent"></div>
+
+    <button id="saveStatsBtn">Save & Return</button>
+</div>
+
+<!-- ============================
+     GAME SCREEN
+     ============================ -->
 <div id="game" style="display:none;">
     <h2>Season Progress</h2>
     <button id="nextEpisodeBtn">Run Next Episode</button>
     <div id="log"></div>
 </div>
 
-<!-- Modular systems -->
+<!-- External modules -->
 <script src="events.js"></script>
 <script src="challenges.js"></script>
 <script src="tiebreakers.js"></script>
 
-<!-- Main game logic -->
+<!-- Main logic -->
 <script src="script.js"></script>
 
 </body>
