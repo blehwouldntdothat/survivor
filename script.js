@@ -585,8 +585,6 @@ function runEpisode() {
     let html = `<h3>Episode ${episode}</h3>`;
 
     recordTribeHistory();
-
-    // IDOL EXPIRATION CHECK (NEW)
     disableExpiredIdols();
 
     const remaining = [...tribes.A, ...tribes.B, ...tribes.Merged];
@@ -605,8 +603,6 @@ function runEpisode() {
     if (checkMerge()) {
         html += `<h2>Merge!</h2>`;
         html += `<p>The tribes merge into one group.</p>`;
-
-        // PLACE MERGE IDOL (NEW)
         placeMergeIdol();
     }
 
@@ -615,6 +611,10 @@ function runEpisode() {
     let immune = null;
     let losingTribe = null;
     let challenge = getRandomChallenge(merged ? "merge" : "tribe");
+
+    /* ============================================================
+       IMMUNITY CHALLENGE
+       ============================================================ */
 
     if (!merged) {
         const tribeAScore = challenge ? computeTribeScore(tribes.A, challenge.weights) : Math.random();
@@ -631,6 +631,7 @@ function runEpisode() {
 
         html += showImages(winningMembers) +
             `<p>Tribe ${winning} wins immunity.</p>`;
+
     } else {
         if (!challenge) {
             immune = currentRemaining[Math.floor(Math.random() * currentRemaining.length)];
@@ -654,9 +655,12 @@ function runEpisode() {
             `<p><strong>Individual Immunity:</strong> ${immune} wins immunity.</p>`;
     }
 
+    /* ============================================================
+       EVENTS
+       ============================================================ */
+
     html += `<h4>Post-Challenge Events</h4>`;
     if (!merged) {
-        // IDOL-FINDING EVENTS (NEW)
         html += `<p>${runEventWithIdols(tribes.A, "A")}</p>`;
         html += `<p>${runEventWithIdols(tribes.B, "B")}</p>`;
     } else {
@@ -664,10 +668,18 @@ function runEpisode() {
         html += `<p>${runEventWithIdols(currentRemaining, "Merged")}</p>`;
     }
 
+    /* ============================================================
+       TRIBAL COUNCIL
+       ============================================================ */
+
     html += `<h4>Tribal Council</h4>`;
 
     let voters = merged ? currentRemaining : tribes[losingTribe];
     let eliminated;
+
+    // Track tie types
+    let wasRevote = false;
+    let wasTiebreaker = false;
 
     if (voters.length === 1) {
         eliminated = voters[0];
@@ -678,6 +690,7 @@ function runEpisode() {
 
         if (merged) tribes.Merged = [];
         else tribes[losingTribe] = [];
+
     } else {
 
         /* ============================================================
@@ -716,7 +729,7 @@ function runEpisode() {
         }
 
         /* ============================================================
-           IDOL PLAY (NEW)
+           IDOL PLAY
            ============================================================ */
 
         const idolResult = handleIdolPlay(voters, immune);
@@ -729,7 +742,7 @@ function runEpisode() {
         }
 
         /* ============================================================
-           TALLY VOTES (WITH IDOLS)
+           TALLY VOTES
            ============================================================ */
 
         let tally = {};
@@ -750,36 +763,37 @@ function runEpisode() {
         let secondHighestPlayers = sorted.filter(e => e[1] === secondHighestVotes).map(e => e[0]);
 
         /* ============================================================
-           ELIMINATION LOGIC (WITH IDOLS)
+           ELIMINATION LOGIC
            ============================================================ */
 
         if (idolResult.playedBy && highestPlayers.includes(idolResult.playedBy)) {
 
-            // Idol protected the top vote-getter → eliminate second-highest
             if (secondHighestPlayers.length === 1) {
                 eliminated = secondHighestPlayers[0];
                 html += showImages([eliminated]) +
                     `<p><strong>${eliminated} is eliminated with the second-highest votes.</strong></p>`;
             } else {
+                wasRevote = true;
                 html += `<p><strong>There is a tie for second-highest votes.</strong></p>`;
                 const tb = runRandomCompetitionTiebreaker(secondHighestPlayers);
                 eliminated = tb.eliminated;
+                wasTiebreaker = true;
                 html += tb.log;
             }
 
         } else if (highestPlayers.length === 1) {
 
-            // Normal elimination
             eliminated = highestPlayers[0];
             html += showImages([eliminated]) +
                 `<p><strong>${eliminated} is voted out.</strong></p>`;
 
         } else {
 
-            // Tie → tiebreaker
+            wasRevote = true;
             html += `<p><strong>The vote is tied between ${highestPlayers.join(", ")}.</strong></p>`;
             const tb = runRandomCompetitionTiebreaker(highestPlayers);
             eliminated = tb.eliminated;
+            wasTiebreaker = true;
             html += tb.log;
         }
 
@@ -806,35 +820,33 @@ function runEpisode() {
 
         let epData = { phase: merged ? "Merge" : "Pre-Merge", results: {} };
 
-        // 1. Tribe immunity (pre-merge only)
+        // Tribe immunity
         if (!merged && losingTribe) {
             const winningTribe = losingTribe === "A" ? "B" : "A";
             const winners = winningTribe === "A" ? tribes.A : tribes.B;
-            winners.forEach(p => {
-                epData.results[p] = "IMM"; // tribe immunity
-            });
+            winners.forEach(p => epData.results[p] = "IMM");
         }
 
-        // 2. Individual immunity (merge only)
+        // Individual immunity
         if (merged && immune) {
-            epData.results[immune] = "W"; // individual immunity win
+            epData.results[immune] = "IMM";
         }
 
-        // 3. Tie players (if any)
-        if (highestPlayers && highestPlayers.length > 1) {
+        // Tie markers
+        if (wasRevote) {
             highestPlayers.forEach(p => {
-                if (!epData.results[p]) epData.results[p] = "T"; // tied at the vote
+                if (!epData.results[p]) {
+                    epData.results[p] = wasTiebreaker ? "TIE*" : "TIE";
+                }
             });
         }
 
-        // 4. Eliminated player
+        // Eliminated
         epData.results[eliminated] = "OUT";
 
-        // 5. Everyone else = SAFE
+        // Everyone else SAFE
         currentRemaining.forEach(p => {
-            if (!epData.results[p]) {
-                epData.results[p] = "SAFE";
-            }
+            if (!epData.results[p]) epData.results[p] = "SAFE";
         });
 
         episodeResults.push(epData);
