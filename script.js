@@ -836,7 +836,7 @@ function runEpisode() {
         if (wasRevote) {
             highestPlayers.forEach(p => {
                 if (!epData.results[p]) {
-                    epData.results[p] = wasTiebreaker ? "TIE*" : "TIE";
+                    epData.results[p] = wasTiebreaker ? "TIEBRK" : "TIE";
                 }
             });
         }
@@ -855,6 +855,7 @@ function runEpisode() {
     setLog(html);
     episode++;
 }
+
 
 /* ============================================================
    MAIN MENU: CAST + STAT EDITOR + SETTINGS
