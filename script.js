@@ -801,17 +801,38 @@ function runEpisode() {
         }
 
         /* ============================================================
-           EPISODE TRACK RECORD
+           EPISODE TRACK RECORD (TEXT-ONLY)
            ============================================================ */
 
         let epData = { phase: merged ? "Merge" : "Pre-Merge", results: {} };
 
+        // 1. Tribe immunity (pre-merge only)
+        if (!merged && losingTribe) {
+            const winningTribe = losingTribe === "A" ? "B" : "A";
+            const winners = winningTribe === "A" ? tribes.A : tribes.B;
+            winners.forEach(p => {
+                epData.results[p] = "IMM"; // tribe immunity
+            });
+        }
+
+        // 2. Individual immunity (merge only)
+        if (merged && immune) {
+            epData.results[immune] = "W"; // individual immunity win
+        }
+
+        // 3. Tie players (if any)
+        if (highestPlayers && highestPlayers.length > 1) {
+            highestPlayers.forEach(p => {
+                if (!epData.results[p]) epData.results[p] = "T"; // tied at the vote
+            });
+        }
+
+        // 4. Eliminated player
+        epData.results[eliminated] = "OUT";
+
+        // 5. Everyone else = SAFE
         currentRemaining.forEach(p => {
-            if (p === eliminated) {
-                epData.results[p] = "OUT";
-            } else if (p === immune) {
-                epData.results[p] = "IMM";
-            } else {
+            if (!epData.results[p]) {
                 epData.results[p] = "SAFE";
             }
         });
