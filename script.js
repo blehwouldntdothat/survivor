@@ -529,9 +529,18 @@ function showTrackRecord() {
             let color = "black";
 
             if (result === "OUT") bg = "#ff9999";
+
             if (result === "IMM") bg = ep.phase === "Pre-Merge" ? "#55cc55" : "#99ff99";
+
             if (result === "SAFE") bg = "white";
+
+            if (result === "IDOL") {
+                bg = "#fff7a8";   // pastel yellow
+                color = "black";
+            }
+
             if (result === "TIE") bg = "#ffbb66";
+
             if (result === "TIEBRK") {
                 bg = "#cc5500";
                 color = "white";
@@ -832,6 +841,11 @@ function runEpisode() {
             epData.results[immune] = "IMM";
         }
 
+        // Idol play marker
+        if (idolResult.playedBy) {
+            epData.results[idolResult.playedBy] = "IDOL";
+        }
+
         // Tie markers
         if (wasRevote) {
             highestPlayers.forEach(p => {
@@ -855,7 +869,6 @@ function runEpisode() {
     setLog(html);
     episode++;
 }
-
 
 /* ============================================================
    MAIN MENU: CAST + STAT EDITOR + SETTINGS
